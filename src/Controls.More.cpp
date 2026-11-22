@@ -1,0 +1,269 @@
+// Copyright 2026 XGstudio
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+#include "vcui/Controls.h"
+
+#include "vcui/Surface.h"
+#include <algorithm>
+#include <cmath>
+
+namespace vcui {
+
+// ---------------- NavItem ----------------
+
+NavItem::NavItem(std::wstring text, std::wstring glyph)
+    : Text(std::move(text)), Glyph(std::move(glyph)) {
+    H = 38.f;
+    Interactive = true;
+    PL = 14.f;
+    PR = 12.f;
+}
+
+D2D1_SIZE_F NavItem::Desired(float availW, float availH) {
+    (void)availH;
+    return D2D1::SizeF(W > 0 ? W : availW, H > 0 ? H : 38.f);
+}
+
+void NavItem::Paint(PaintCtx& ctx) {
+    const Tokens& t = ctx.t;
+    float rad = 4.f;
+    float hov = HoverA();
+
+    if (Active) ctx.g.RoundRect(fr_, rad, t.accentSoft);
+    if (!Active && hov > .01f) ctx.g.RoundRect(fr_, rad, A(CtrlHover(t), hov));
+
+    if (Active) {
+        D2D1_RECT_F bar{ fr_.left, fr_.top + 6.f, fr_.left + 3.f, fr_.bottom - 6.f };
+        ctx.g.RoundRect(bar, 1.5f, t.accent);
+    }
+
+    float ix = fr_.left + PL;
+    if (!Glyph.empty()) {
+        D2D1_RECT_F gr{ ix, fr_.top, ix + 18.f, fr_.bottom };
+        ctx.g.Glyph(gr, Glyph, 16.f, Active ? t.accent : Mix(t.text2, t.wz, hov));
+        ix += 26.f;
+    }
+
+    D2D1_RECT_F tr{ ix, fr_.top, fr_.right - PR, fr_.bottom };
+    ctx.g.Text(tr, Text, 13.f, Active ? 600 : 400,
+               Active ? t.wz : Mix(t.text2, t.wz, hov),
+               HAlign::Left, VAlign::Middle);
+}
+
+void NavItem::OnClick() {
+    if (!Enabled) return;
+    Active = true;
+    if (Clicked) Clicked();
+}
+
+// ---------------- ListRow ----------------
+
+ListRow::ListRow(std::wstring title, std::wstring sub, std::wstring right)
+    : Title(std::move(title)), Sub(std::move(sub)), Right(std::move(right)) {
+    H = 56.f;
+    PL = 14.f;
+    PR = 14.f;
+}
+
+D2D1_SIZE_F ListRow::Desired(float availW, float availH) {
+    (void)availH;
+    return D2D1::SizeF(W > 0 ? W : availW, H > 0 ? H : 56.f);
+}
+
+void ListRow::Paint(PaintCtx& ctx) {
+    const Tokens& t = ctx.t;
+    float hov = HoverA();
+
+    if (Selected)         ctx.g.RoundRect(fr_, 4.f, t.accentSel);
+    else if (hov > .01f)  ctx.g.RoundRect(fr_, 4.f, A(CtrlHover(t), hov));
+
+    if (Selected) {
+        D2D1_RECT_F bar{ fr_.left, fr_.top + 8.f, fr_.left + 3.f, fr_.bottom - 8.f };
+        ctx.g.RoundRect(bar, 1.5f, t.accent);
+    }
+
+    float x = fr_.left + PL;
+    float rightW = 0.f;
+    if (!Right.empty()) {
+        rightW = (float)Right.size() * 12.f * 0.62f + 8.f;
+        ctx.g.Text(D2D1_RECT_F{ fr_.right - PR - rightW, fr_.top, fr_.right - PR, fr_.bottom },
+                   Right, 12.f, 400, t.text2, HAlign::Right, VAlign::Middle);
+    }
+
+    if (Sub.empty()) {
+        ctx.g.Text(D2D1_RECT_F{ x, fr_.top, fr_.right - PR - rightW, fr_.bottom },
+                   Title, 14.f, Selected ? 600 : 400, t.wz, HAlign::Left, VAlign::Middle);
+    } else {
+        float cy = (fr_.top + fr_.bottom) * .5f;
+        ctx.g.Text(D2D1_RECT_F{ x, cy - 20.f, fr_.right - PR - rightW, cy - 2.f },
+                   Title, 14.f, Selected ? 600 : 400, t.wz, HAlign::Left, VAlign::Bottom);
+        ctx.g.Text(D2D1_RECT_F{ x, cy + 1.f, fr_.right - PR - rightW, cy + 19.f },
+                   Sub, 12.f, 400, t.text2, HAlign::Left, VAlign::Top);
+    }
+}
+
+// ---------------- IconButton ----------------
+
+IconButton::IconButton(std::wstring glyph, bool ghost)
+    : Glyph(std::move(glyph)), Ghost(ghost) {
+    W = 32.f;
+    H = 32.f;
+    Interactive = true;
+}
+
+D2D1_SIZE_F IconButton::Desired(float, float) {
+    return D2D1::SizeF(W > 0 ? W : 32.f, H > 0 ? H : 32.f);
+}
+
+void IconButton::Paint(PaintCtx& ctx) {
+    const Tokens& t = ctx.t;
+    float rad = 4.f;
+    float hov = HoverA(), prs = PressA();
+
+    if (!Ghost) {
+        D2D1_COLOR_F fill = Mix(Ctrl(t), CtrlHover(t), hov);
+        fill = Mix(fill, t.pressed, prs);
+        ctx.g.RoundRect(fr_, rad, fill);
+        ctx.g.StrokeRect(fr_, rad, t.border, 1.f);
+    } else if (hov > .01f) {
+        D2D1_COLOR_F fill = Mix(CtrlHover(t), t.pressed, prs);
+        ctx.g.RoundRect(fr_, rad, A(fill, hov));
+    }
+
+    ctx.g.Glyph(fr_, Glyph, GlyphSize, Enabled ? t.wz : t.text3, HAlign::Center, VAlign::Middle);
+}
+
+// ---------------- Dropdown ----------------
+
+Dropdown::Dropdown(std::vector<std::wstring> items, int selected)
+    : Items(std::move(items)), Selected(selected) {
+    H = 34.f;
+    W = 180.f;
+    Interactive = true;
+}
+
+D2D1_SIZE_F Dropdown::Desired(float availW, float availH) {
+    (void)availW; (void)availH;
+    return D2D1::SizeF(W > 0 ? W : 180.f, H > 0 ? H : 34.f);
+}
+
+bool Dropdown::Update(float dt) {
+    bool changed = Widget::Update(dt);
+    // 定长时间线（150ms）+ smoothstep，避免指数尾部拖沓、收尾突然消失
+    if (aLinear != (Open ? 1.f : 0.f)) {
+        float step = dt / .15f;
+        aLinear = Open ? std::min(1.f, aLinear + step) : std::max(0.f, aLinear - step);
+        AnimDirty = true;
+        changed = true;
+        if (menu_) menu_->AnimDirty = true;   // 菜单自己的透明度也变了，必须一起进脏矩形
+    }
+    float e = aLinear * aLinear * (3.f - 2.f * aLinear);       // smoothstep
+    aOpen = e;
+    if (menu_) {
+        menu_->Opacity = aOpen;
+        if (!Open && aLinear <= 0.f) {
+            if (Host) {
+                Host->ClearDismissIf(this);
+                Host->RemoveOverlayDeferred(menu_.get());
+            }
+            menu_.reset();
+        }
+    }
+    return changed;
+}
+
+void Dropdown::Paint(PaintCtx& ctx) {
+    const Tokens& t = ctx.t;
+    float rad = ctx.m.radiusInput;
+    float hov = HoverA();
+
+    ctx.g.RoundRect(fr_, rad, Mix(Ctrl(t), CtrlHover(t), hov));
+    ctx.g.StrokeRect(fr_, rad, (Open || Focus) ? t.accent : t.border,
+                     (Open || Focus) ? 1.6f : 1.f);
+
+    float pad = 12.f;
+    float cx = fr_.right - pad - 5.f;
+    float cy = (fr_.top + fr_.bottom) * .5f;
+
+    std::wstring label = (Selected >= 0 && Selected < (int)Items.size()) ? Items[Selected] : L"";
+    ctx.g.Text(D2D1_RECT_F{ fr_.left + pad, fr_.top, cx - 10.f, fr_.bottom }, label, 13.f, 400,
+               t.wz, HAlign::Left, VAlign::Middle);
+
+    // 箭头随展开状态翻转
+    float d = aOpen * 4.f;
+    ctx.g.Line(cx - 4.f, cy - 2.f + d, cx, cy + 2.f - d, t.text2, 1.4f);
+    ctx.g.Line(cx, cy + 2.f - d, cx + 4.f, cy - 2.f + d, t.text2, 1.4f);
+}
+
+void Dropdown::OnClickAt(float, float) {
+    if (!Enabled) return;
+    if (Open) { CloseMenu(); return; }
+    if (Items.empty() || !Host) return;
+
+    // 上一次淡出还没走完就再点开：先把旧弹层摘掉，避免同一控件挂两个菜单
+    if (menu_) {
+        Host->RemoveOverlay(menu_.get());
+        menu_.reset();
+    }
+    aLinear = 0.f;
+    aOpen = 0.f;
+
+    float menuW = MenuWidth > 0 ? MenuWidth : (fr_.right - fr_.left);
+    float rowH = 34.f;
+    float menuH = float(Items.size()) * rowH + 8.f;
+
+    auto card = std::make_shared<Card>();
+    card->PL = card->PT = card->PR = card->PB = 4.f;
+    card->Radius = 6.f;
+    card->Shadow = true;
+
+    auto box = VBox(0.f);
+    card->Add(box);
+
+    for (size_t i = 0; i < Items.size(); ++i) {
+        auto row = std::make_shared<ListRow>(Items[i], L"", L"");
+        row->H = rowH;
+        row->PL = 10.f;
+        row->PR = 10.f;
+        row->Selected = (int(i) == Selected);
+        int idx = int(i);
+        auto self = this;
+        row->Clicked = [self, idx]() {
+            self->Selected = idx;
+            if (self->Changed) self->Changed(idx);
+            self->CloseMenu();
+        };
+        box->Add(row);
+    }
+
+    card->X = fr_.left;
+    card->Y = fr_.bottom + 4.f;
+    card->W = menuW;
+    card->H = menuH;
+
+    menu_ = card;
+    Open = true;
+    Host->AddOverlay(card);
+    Host->SetDismiss([this]() { CloseMenu(); }, this);
+}
+
+void Dropdown::CloseMenu() {
+    Open = false;
+    if (Host) Host->ClearDismissIf(this);
+    // 菜单等淡出动画结束再销毁（见 Update）
+}
+
+} // namespace vcui
