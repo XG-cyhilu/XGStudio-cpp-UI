@@ -306,7 +306,7 @@ public:
 - 帧循环自建：有动画时 `Tick + UpdateWindow + DwmFlush` 跟合成节拍，闲置时挂起（CPU 0）
 - 脏矩形：动画只重绘标脏控件区域（含 28px 阴影余量），滚动只刷滚动容器
 - 文本布局缓存（`IDWriteTextLayout`）与阴影位图缓存（尺寸取整 4px，上限 64）
-- 实测（HD Graphics 4000，x64 Release）：滚动/动画帧 <12ms，同色全量重绘 <12ms，空闲 0% CPU；`VCUIDemo` 常驻约 49MB 工作集
+- 实测（HD Graphics 4000，x64 Release）：滚动/动画帧 <12ms，同色全量重绘 <12ms，空闲 0% CPU；`VCUIDemo` 常驻约 20MB 工作集
 
 调试开关（环境变量）：
 
