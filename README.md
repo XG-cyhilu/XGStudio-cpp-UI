@@ -368,6 +368,21 @@ public:
 `PaintCtx` 提供 `g`（绘制）、`t`（Token）、`m`（度量）、`scale`（DPI）、`time`（秒）。
 需要逐帧动画就重写 `Update(dt)` 并在视觉有变化时置 `AnimDirty = true`；`Surface` 会据此只重绘该控件矩形。
 
+## 动画
+
+渲染是消息驱动 + 脏矩形，**不在点击回调里同步画**：事件回调只改控件树、标脏，真正的绘制发生在 `WM_PAINT`；有动画时帧循环自建（`Tick → UpdateWindow → DwmFlush` 60fps），静止后自动睡回 0% CPU。
+
+控件级动画（当前：切页入场）
+
+```cpp
+content->FadeIn(.18f, 10.f);   // 180ms 淡入 + 从下方 10px 上浮落位
+```
+
+- `FadeIn(dur, dy)` 会把 `Opacity` 由 0 推到 1（ease-out cubic，贴近 Fluent 的 decelerate），同时临时改写 `MT` 做位移，动画结束时两个字段都精确恢复原值
+- 会自动 `PlayAnim()` 唤醒帧循环；不调它的话循环在静止状态是睡着的
+- 每一项动画都会把自己标成 `AnimDirty`，`Surface::Tick` 只重绘那一块（含 28px 阴影余量）
+- 想连子项逐个入场，给每行单独 `FadeIn` 并错开开始时间即可（目前不支持 delay，需要自己用 `AnimT` 起手）
+
 ## 性能
 
 测试机:

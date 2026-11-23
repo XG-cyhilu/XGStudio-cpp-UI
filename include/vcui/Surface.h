@@ -48,6 +48,8 @@ public:
     Widget* Root() const { return root_.get(); }
 
     void Invalidate();
+    // 唤醒动画帧循环（平时没有动画时循环是睡着的）。控件入场动画会自动调用。
+    void PlayAnim();
     // 只重绘一小块（动画帧用），坐标 DIP
     void InvalidateRectD(D2D1_RECT_F rc);
     HWND Hwnd() const { return hwnd_; }

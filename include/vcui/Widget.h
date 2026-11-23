@@ -28,6 +28,9 @@ namespace vcui {
 
 class Surface;
 
+
+class Surface;
+
 enum class CursorShape { Arrow, Hand, IBeam };
 
 struct PaintCtx {
@@ -75,6 +78,12 @@ public:
     bool AnimDirty = false;    // 本帧自身动画有变化（Surface 用来算脏矩形）
     // 返回 true 表示这一帧视觉有变化，需要重绘
     virtual bool Update(float dt);
+
+    // ---- 入场动画（切页用）：淡入 + 可选向下位移 ----
+    // dy > 0 时从"上方 dy 像素处"落位，MT 每帧被改写，动画结束后恢复原值。
+    void FadeIn(float dur = .18f, float dy = 0.f);
+    float AnimT = -1.f;        // < 0 表示没有入场动画
+    float AnimDur = .18f, AnimBaseOpacity = 1.f, AnimDy = 0.f, AnimBaseMT = 0.f;
 
     // ---- 树 ----
     Widget* Parent = nullptr;

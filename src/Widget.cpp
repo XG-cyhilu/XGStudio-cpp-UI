@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "vcui/Widget.h"
+#include "vcui/Surface.h"
 #include <cmath>
 
 namespace vcui {
@@ -107,6 +108,18 @@ std::shared_ptr<Widget> Sizer(float w, float h) {
     return s;
 }
 
+void Widget::FadeIn(float dur, float dy) {
+    AnimDur = dur > 0.f ? dur : .18f;
+    AnimDy = dy;
+    AnimBaseOpacity = Opacity;
+    AnimBaseMT = MT;
+    AnimT = 0.f;
+    Opacity = 0.f;              // 第一帧就画成透明，避免闪一下
+    MT = AnimBaseMT + AnimDy;
+    AnimDirty = true;
+    if (Host) Host->PlayAnim();  // 唤醒帧循环（平时是睡着的）
+}
+
 bool Widget::Update(float dt) {
     bool changed = false;
     auto approach = [&](float& v, float target, float tau) {
@@ -119,6 +132,24 @@ bool Widget::Update(float dt) {
     };
     approach(aHover, Hover && Enabled ? 1.f : 0.f, .10f);
     approach(aPress, Press ? 1.f : 0.f, .06f);
+
+    // 入场：ease-out cubic（贴近 Fluent 的 decelerate）
+    if (AnimT >= 0.f) {
+        AnimT += dt;
+        float p = AnimT / AnimDur;
+        if (p > 1.f) p = 1.f;
+        float e = 1.f - std::pow(1.f - p, 3.f);
+        Opacity = AnimBaseOpacity * e;
+        MT = AnimBaseMT + AnimDy * (1.f - e);
+        AnimDirty = true;
+        changed = true;
+        if (p >= 1.f) {
+            AnimT = -1.f;
+            Opacity = AnimBaseOpacity;
+            MT = AnimBaseMT;
+        }
+    }
+
     for (auto& k : kids_) changed |= k->Update(dt);
     return changed;
 }

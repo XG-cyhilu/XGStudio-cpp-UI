@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -153,6 +153,8 @@ void Surface::InvalidateRectD(D2D1_RECT_F rc) {
         InvalidateRect(hwnd_, &r, FALSE);
     }
 }
+
+void Surface::PlayAnim() { KickAnim(); }
 
 void Surface::KickAnim() {
     if (!hwnd_) return;
