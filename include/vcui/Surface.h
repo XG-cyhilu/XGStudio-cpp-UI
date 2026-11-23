@@ -141,6 +141,7 @@ private:
     bool customFrame_ = false;
     float resizeBorder_ = 6.f;
     bool windowActive_ = true;            // 窗口在前台时才画焦点环
+    bool focusVisible_ = false;           // 焦点环只在"键盘焦点"时显示：鼠标点出来的焦点不画
     bool destroyed_ = false;              // 已收到 WM_DESTROY（析构时别再 DestroyWindow）
     bool mouseDown_ = false;
     float downX_ = 0.f, downY_ = 0.f;

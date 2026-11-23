@@ -388,7 +388,7 @@ void Surface::ForgetWidget(Widget* w) {
 }
 
 void Surface::SetFocus(Widget* w) {
-    if (focus_ == w) return;
+    if (focus_ == w) { Invalidate(); return; }   // 焦点环可见性可能刚被切过，仍要重绘
     KickAnim();
     if (focus_) {
         focus_->Focus = false;
@@ -417,7 +417,8 @@ void Surface::EnsureVisible(Widget* w) {
 
 void Surface::PaintFocusRing(PaintCtx& ctx) {
     Widget* f = focus_;
-    if (!f || !f->FocusRing || !windowActive_) return;
+    // Fluent 的规矩：鼠标点出来的焦点不画环，只有键盘走出来的焦点（focus visible）才画
+    if (!f || !f->FocusRing || !windowActive_ || !focusVisible_) return;
     // 祖先里有隐藏的直接不画
     for (Widget* p = f; p; p = p->Parent)
         if (!p->Visible) return;
@@ -464,6 +465,7 @@ void Surface::CycleFocus(bool back) {
         if (all[i] == focus_) { idx = int(i); break; }
     int n = int(all.size());
     int next = back ? (idx <= 0 ? n - 1 : idx - 1) : ((idx + 1) % n);
+    focusVisible_ = true;      // 键盘走出来的焦点才画环
     SetFocus(all[next]);
 }
 
@@ -725,6 +727,8 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         downX_ = x; downY_ = y;
         dragging_ = false;
         active_ = w;
+        // 鼠标点出来的焦点不画焦点环（Fluent：focus 有，focus visible 没有）
+        if (focusVisible_) { focusVisible_ = false; Invalidate(); }
         if (w) {
             if (w->Focusable()) SetFocus(w);
             else SetFocus(nullptr);
@@ -820,6 +824,8 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
                 return 0;
             }
         }
+        // 键盘操作过就进入"键盘焦点"模式（NavItem 的方向键换焦点也在这里生效）
+        if (!focusVisible_) { focusVisible_ = true; Invalidate(); }
         if (focus_) focus_->OnKeyDown((int)wp);
         Invalidate();
         return 0;
@@ -829,6 +835,7 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         // Alt+Down / Alt+Up 是下拉框的"展开/收起"标准快捷键，只转发这两键，
         // 其余交给系统（Alt+F4 关闭、Alt+Space 系统菜单）
         if ((GetKeyState(VK_MENU) & 0x8000) && focus_ && (wp == VK_DOWN || wp == VK_UP)) {
+            if (!focusVisible_) focusVisible_ = true;
             focus_->OnKeyDown(wp == VK_DOWN ? VK_F4 : VK_ESCAPE);
             Invalidate();
             return 0;
