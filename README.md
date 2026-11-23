@@ -302,6 +302,14 @@ public:
 
 ## 性能
 
+测试机:
+| 项 | 配置 |
+| --- | --- |
+| GPU0(未使用) | NVIDIA NVS 5400M |
+| GPU1(iGPU) | Intel HD Graphics 4000 |
+| CPU | Intel Core i7-3520M |
+| RAM | 12GB DDR3 (1600MHz) |
+
 - 持久离屏层：绘制发生在 `ID2D1BitmapRenderTarget`，每帧只贴一次到窗口
 - 帧循环自建：有动画时 `Tick + UpdateWindow + DwmFlush` 跟合成节拍，闲置时挂起（CPU 0）
 - 脏矩形：动画只重绘标脏控件区域（含 28px 阴影余量），滚动只刷滚动容器
