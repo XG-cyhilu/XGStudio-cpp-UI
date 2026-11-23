@@ -83,6 +83,7 @@ ListRow::ListRow(std::wstring title, std::wstring sub, std::wstring right)
     H = 56.f;
     PL = 14.f;
     PR = 14.f;
+    Interactive = true;   // 行本身是控件：不置位的话点击会被判定"没命中"，弹层里的菜单项点不动
 }
 
 D2D1_SIZE_F ListRow::Desired(float availW, float availH) {
@@ -264,12 +265,16 @@ void Dropdown::OnClickAt(float, float) {
     menu_ = card;
     Open = true;
     Host->AddOverlay(card);
+    Host->PlayAnim();          // 菜单从 aOpen=0 淡入，必须唤醒帧循环
     Host->SetDismiss([this]() { CloseMenu(); }, this);
 }
 
 void Dropdown::CloseMenu() {
     Open = false;
-    if (Host) Host->ClearDismissIf(this);
+    if (Host) {
+        Host->ClearDismissIf(this);
+        Host->PlayAnim();      // 淡出同样要帧循环来推 aOpen
+    }
     // 菜单等淡出动画结束再销毁（见 Update）
 }
 

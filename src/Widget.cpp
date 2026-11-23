@@ -47,9 +47,16 @@ Widget::~Widget() = default;
 Widget& Widget::Add(std::shared_ptr<Widget> child) {
     if (!child) return *this;
     child->Parent = this;
-    child->Host = Host;
-    if (!child->Id.empty()) {
-        // 允许按 id 查找（Surface 挂载时会递归补齐 Host）
+    // 子树可能是离线搭好再挂上来的（比如"先 Add 到 col，再把 col 塞进 ScrollView"），
+    // 必须把 Host / GFX 递归补进去，否则里层控件拿不到 Surface（下拉框就无法挂 Overlay）。
+    if (Host || GFX) {
+        std::shared_ptr<Widget> keep = child;
+        std::function<void(Widget*)> walk = [&](Widget* w) {
+            w->Host = Host;
+            if (GFX) w->GFX = GFX;
+            for (auto& k : w->Children()) walk(k.get());
+        };
+        walk(keep.get());
     }
     kids_.push_back(std::move(child));
     return *this;
