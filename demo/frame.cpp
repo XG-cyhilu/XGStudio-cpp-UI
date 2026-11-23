@@ -6,18 +6,14 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
 // SPDX-License-Identifier: Apache-2.0
-
-// 顶栏导航 + 左侧子导航 + 平坦内容区 的排版打样（无卡片包内容）。
+//
+// XGStudio-cpp-UI 控件库展示（不是启动器打样）：
+//   顶栏导航 + 左侧子导航 + 平坦内容区，内容全部是控件清单与用法说明。
 // 用法：VCUIFrameDemo
 //   VCUI_DEMO_DARK=1      深色
 //   VCUI_NAV_CENTER=1     顶栏导航"最小居中"，否则整栏
+//   VCUI_PAGE=0..3        启动页（总览/控件/布局/主题）
 
 #include <windows.h>
 #include <functional>
@@ -25,14 +21,20 @@
 
 using namespace vcui;
 
-// 文字一律走 Fluent type ramp：字号 / 字重 / 行高成套拿
+// 文字统一走 Fluent type ramp：字号 / 字重 / 行高成套拿
 static std::shared_ptr<Label> L(std::wstring s, const TypeStyle& sty) {
     auto l = std::make_shared<Label>(std::move(s), sty.size, sty.weight);
     l->LineHeight = sty.lineHeight;
     return l;
 }
 
-// 平坦内容区的一行：左标签 + 右值，最后跟一条分隔线
+static std::shared_ptr<Label> Section(std::wstring title) {
+    auto s = L(std::move(title), Type::Subtitle1);
+    s->MT = 8.f;
+    return s;
+}
+
+// 键值行：左标签固定列宽 + 右值
 static std::shared_ptr<Widget> FormRow(const std::wstring& label, const std::wstring& value) {
     auto row = HBox(16.f);
     row->H = 48.f;
@@ -47,10 +49,12 @@ static std::shared_ptr<Widget> FormRow(const std::wstring& label, const std::wst
     return row;
 }
 
-static std::shared_ptr<Widget> Section(const std::wstring& title) {
-    auto s = L(title, Type::Subtitle1);
-    s->MT = 8.f;
-    return s;
+// 控件名 + 一句用法说明，作为每个展示块的小标题
+static std::shared_ptr<Widget> DemoHead(const std::wstring& name, const std::wstring& desc) {
+    auto col = VBox(2.f);
+    col->Add(L(name, Type::Body1Strong));
+    col->Add(L(desc, Type::Caption1));
+    return col;
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
@@ -62,22 +66,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int startPage = GetEnvironmentVariableW(L"VCUI_PAGE", pageBuf, 8) > 0 ? _wtoi(pageBuf) : 0;
 
     Surface app;
-    app.SetMinSize(960, 600);
+    app.SetMinSize(960, 620);
     app.SetCustomFrame(true);
-    if (!app.Create(L"VCUI Frame Demo", 1180, 740, dark)) return 1;
+    if (!app.Create(L"XGStudio-cpp-UI · 控件展示", 1180, 740, dark)) return 1;
 
     auto root = VBox(0.f);
 
-    // ---- 顶栏：标题 + 导航（整栏 / 最小居中）+ 窗口按钮 ----
     auto bar = std::make_shared<TitleBar>();
-    bar->Title = L"Void Craft";
+    bar->Title = L"XGStudio-cpp-UI";
     bar->Fill = true;
     bar->H = 48.f;
-    bar->NavItems = { L"启动", L"版本", L"下载", L"设置" };
+    bar->NavItems = { L"总览", L"控件", L"布局", L"主题" };
     bar->NavCentered = navCenter;
     root->Add(bar);
 
-    // ---- 主体：左侧子导航 + 内容区 ----
     auto body = HBox(0.f);
     body->Grow = 1.f;
 
@@ -93,246 +95,418 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     body->Add(content);
     root->Add(body);
 
-    // 页面 0：启动（无子导航）
-    auto BuildLaunch = [&]() {
+    // ---------------- 页 0：总览（关于本库） ----------------
+    auto BuildOverview = [&]() {
         sub->Visible = false;
 
         auto head = HBox(16.f);
-        head->H = 44.f;
+        head->H = 56.f;
         head->Cross = Stack::Center;
-        auto ver = L(L"1.20.4", Type::Title1);
-        ver->Grow = 1.f;
-        auto play = std::make_shared<Button>(L"启动游戏", true);
-        play->W = 160.f;
-        play->H = 40.f;
-        auto open = std::make_shared<Button>(L"打开文件夹");
-        open->W = 132.f;
-        open->H = 40.f;
-        open->MR = 8.f;
-        head->Add(ver);
-        head->Add(open);
-        head->Add(play);
+        auto title = L(L"XGStudio-cpp-UI", Type::Title1);
+        title->Grow = 1.f;
+        head->Add(title);
+        head->Add(std::make_shared<Badge>(L"v0.1.0", Badge::Accent));
         content->Add(head);
 
-        auto subline = L(L"Fabric 0.15.11   ·   上次游玩 2 小时前   ·   累计 37 小时", Type::Body1);
-        subline->MT = 8.f;
-        subline->Ellipsis = true;
-        content->Add(subline);
+        auto lead = L(L"Windows 上全自绘的 Fluent 2 控件库：没有一个系统控件，每个像素都由 Direct2D 自己画。", Type::Body1);
+        lead->MT = 2.f;
+        content->Add(lead);
 
         auto div = std::make_shared<Divider>();
-        div->MT = 24.f;
-        div->MB = 8.f;
+        div->MT = 20.f;
         content->Add(div);
 
-        content->Add(Section(L"运行"));
-        content->Add(FormRow(L"Java", L"17.0.9 (x64)  ·  C:\\Program Files\\Java\\jdk-17.0.9"));
-        auto d1 = std::make_shared<Divider>();
-        content->Add(d1);
-        content->Add(FormRow(L"内存", L"4096 MB  (上限 4096)"));
-        auto d2 = std::make_shared<Divider>();
-        content->Add(d2);
-        content->Add(FormRow(L"游戏目录", L"版本隔离  ·  versions\\1.20.4-Fabric 0.15.11"));
-        auto d3 = std::make_shared<Divider>();
-        content->Add(d3);
-        content->Add(FormRow(L"加载器", L"Fabric 0.15.11"));
+        content->Add(Section(L"构成"));
+        content->Add(FormRow(L"绘制", L"Direct2D 1.0 + DirectWrite（离屏层，不依赖 D2D1.1 / Effect）"));
+        content->Add(std::make_shared<Divider>());
+        content->Add(FormRow(L"窗口", L"Win32 自绘边框，客户区吃掉整个窗口"));
+        content->Add(std::make_shared<Divider>());
+        content->Add(FormRow(L"语言 / 编译器", L"C++17 · MSVC 2019/2022 x64"));
+        content->Add(std::make_shared<Divider>());
+        content->Add(FormRow(L"系统要求", L"Windows 10 1703+（Per-Monitor V2）"));
+        content->Add(std::make_shared<Divider>());
+        content->Add(FormRow(L"许可证", L"Apache-2.0"));
+        content->Add(std::make_shared<Divider>());
+        content->Add(FormRow(L"仓库", L"github.com/XG-cyhilu/XGStudio-cpp-UI"));
 
-        auto lt = L(L"最近日志", Type::Subtitle1);
-        lt->MT = 28.f;
-        content->Add(lt);
+        content->Add(Section(L"这一版有什么"));
+        auto stats = HBox(12.f);
+        stats->H = 44.f;
+        stats->Cross = Stack::Center;
+        stats->Add(std::make_shared<Badge>(L"19 个控件", Badge::Neutral));
+        stats->Add(std::make_shared<Badge>(L"8 种容器", Badge::Neutral));
+        stats->Add(std::make_shared<Badge>(L"14 档字级", Badge::Accent));
+        stats->Add(std::make_shared<Badge>(L"浅/深 × 2 色板", Badge::Success));
+        content->Add(stats);
 
-        auto logScroll = std::make_shared<ScrollView>();
-        logScroll->Grow = 1.f;
-        logScroll->MT = 10.f;
-        auto logBox = VBox(2.f);
-        for (int i = 0; i < 30; ++i) {
-            wchar_t b[160];
-            swprintf_s(b, L"[12:%02d:%02d] [INFO] 校验 assets/objects/%02x/%04d  正常", i, (i * 7) % 60, i % 256, i * 13);
-            auto line = L(b, Type::Caption1);
-            line->Ellipsis = true;
-            logBox->Add(line);
-        }
-        logScroll->Add(logBox);
-        content->Add(logScroll);
+        auto note = L(L"换皮不用改控件代码：颜色走 Token，尺寸走 Metrics，字号走 Type ramp。", Type::Caption1);
+        note->MT = 12.f;
+        content->Add(note);
         content->StaggerIn();
     };
 
-    // 页面 1：版本（子导航：已安装 / 可安装 / 整合包）
-    // 子导航点一下要真的换内容，所以按 tab 重建：sub 列表 + content 正文
-    int verTab = 0;
-    std::function<void(int)> ShowVersions;
-    ShowVersions = [&](int tab) {
-        verTab = tab;
+    // ---------------- 页 1：控件 ----------------
+    int ctlTab = 0;
+    std::function<void(int)> ShowControls;
+    ShowControls = [&](int tab) {
+        ctlTab = tab;
         sub->Visible = true;
         sub->Clear();
-        const wchar_t* names[3] = { L"已安装", L"可安装", L"整合包" };
-        const wchar_t* glyphs[3] = { L"\xE8F4", L"\xE896", L"\xE8F1" };
+        const wchar_t* tabs[3] = { L"输入类", L"选择类", L"展示类" };
+        const wchar_t* glyphs[3] = { L"\xE8D2", L"\xE73A", L"\xE8B6" };
         for (int i = 0; i < 3; ++i) {
-            auto n = std::make_shared<NavItem>(names[i], glyphs[i]);
+            auto n = std::make_shared<NavItem>(tabs[i], glyphs[i]);
             n->Active = (i == tab);
-            n->Clicked = [&, i]() { if (verTab != i) { ShowVersions(i); app.Invalidate(); } };
+            n->Clicked = [&, i]() { if (ctlTab != i) { ShowControls(i); app.Invalidate(); } };
             sub->Add(n);
         }
 
         content->Clear();
-        auto head = HBox(12.f);
-        head->H = 44.f;
-        head->Cross = Stack::Center;
-        auto t = L(tab == 0 ? L"已安装的版本" : (tab == 1 ? L"可安装的版本" : L"整合包"),
-                  Type::Subtitle1);
-        t->Grow = 1.f;
-        auto search = std::make_shared<Input>(L"搜索版本…");
-        search->W = 240.f;
-        head->Add(t);
-        head->Add(search);
-        content->Add(head);
-
+        content->Add(L(tabs[tab], Type::Subtitle1));
+        auto note0 = L(L"每个控件都能单独拿出来用；悬停、按下、焦点都是控件自己画的。", Type::Caption1);
+        note0->MT = 4.f;
+        content->Add(note0);
         auto div = std::make_shared<Divider>();
         div->MT = 14.f;
         content->Add(div);
 
-        auto listScroll = std::make_shared<ScrollView>();
-        listScroll->Grow = 1.f;
-        auto rows = VBox(0.f);
-        for (int i = 0; i < 16; ++i) {
-            wchar_t t2[96];
-            std::wstring sub1, right;
-            if (tab == 0) {
-                swprintf_s(t2, L"1.%d.4-Fabric 0.15.11-性能优化整合包", 16 + i % 5);
-                sub1 = L"1.20.4  ·  Fabric 0.15.11";
-                right = (i == 0 ? L"已选择" : L"3 天前");
-            } else if (tab == 1) {
-                swprintf_s(t2, L"1.%d.%d  ·  正式版", 16 + i % 6, i % 3);
-                sub1 = L"未安装  ·  约 1.2 GB";
-                right = L"下载";
-            } else {
-                swprintf_s(t2, L"流萤 1.20.1 整合包 v%d", 1 + i % 4);
-                sub1 = L"207+ Mod  ·  已安装";
-                right = L"打开";
-            }
-            auto row = std::make_shared<ListRow>(t2, sub1, right);
-            row->H = 52.f;
-            row->Selected = (tab == 0 && i == 0);
-            rows->Add(row);
-            rows->Add(std::make_shared<Divider>());
-        }
-        listScroll->Add(rows);
-        content->Add(listScroll);
-        content->StaggerIn();
-    };
+        auto scroll = std::make_shared<ScrollView>();
+        scroll->Grow = 1.f;
+        auto col = VBox(22.f);
+        col->MT = 18.f;
 
-    // 页面 2：下载（无子导航）
-    auto BuildDownload = [&]() {
-        sub->Visible = false;
+        if (tab == 0) {
+            auto b1 = VBox(10.f);
+            b1->Add(DemoHead(L"Input", L"单行输入：选区、剪贴板、撤销、IME 组合串与候选窗定位"));
+            auto in1 = std::make_shared<Input>(L"输入点什么…");
+            in1->W = 360.f;
+            b1->Add(in1);
+            col->Add(b1);
 
-        auto t = L(L"下载队列", Type::Subtitle1);
-        content->Add(t);
-
-        auto div = std::make_shared<Divider>();
-        div->MT = 14.f;
-        content->Add(div);
-
-        auto listScroll = std::make_shared<ScrollView>();
-        listScroll->Grow = 1.f;
-        auto rows = VBox(14.f);
-        for (int i = 0; i < 6; ++i) {
-            auto box = VBox(6.f);
+            auto b2 = VBox(10.f);
+            b2->Add(DemoHead(L"Slider", L"0..1 连续值，点击和拖拽都会回调 Changed"));
+            auto sl = std::make_shared<Slider>(.35f);
+            sl->W = 320.f;
+            auto slVal = L(L"35%", Type::Caption1);
             auto row = HBox(12.f);
-            wchar_t name[96];
-            swprintf_s(name, L"libraries\\com\\mojang\\%d.0.3\\asset-%d.jar", i, i);
-            auto n = L(name, Type::Body1);
-            n->Grow = 1.f;
-            n->Ellipsis = true;
-            wchar_t pct[32];
-            swprintf_s(pct, L"%d%%", 10 + i * 15);
-            auto p = L(pct, Type::Caption1);
-            row->Add(n);
-            row->Add(p);
-            auto bar = std::make_shared<Progress>(0.1f + 0.15f * i);
-            box->Add(row);
-            box->Add(bar);
-            rows->Add(box);
+            row->Cross = Stack::Center;
+            row->Add(sl);
+            row->Add(slVal);
+            b2->Add(row);
+            sl->Changed = [&app, slVal](float v) {
+                wchar_t b[32];
+                swprintf_s(b, L"%d%%", (int)(v * 100.f + .5f));
+                slVal->Text = b;
+                app.Invalidate();
+            };
+            col->Add(b2);
+
+            auto b3 = VBox(10.f);
+            b3->Add(DemoHead(L"Dropdown", L"下拉框：菜单挂在 Overlay 层，可超出窗口边界"));
+            auto dd = std::make_shared<Dropdown>(std::vector<std::wstring>{ L"跟随系统", L"浅色", L"深色" }, 0);
+            dd->W = 220.f;
+            b3->Add(dd);
+            col->Add(b3);
+
+            auto b4 = VBox(10.f);
+            b4->Add(DemoHead(L"Segmented", L"分段单选，适合 2–4 个同层级选项"));
+            auto seg = std::make_shared<Segmented>(std::vector<std::wstring>{ L"天", L"周", L"月" }, 1);
+            seg->W = 260.f;
+            b4->Add(seg);
+            col->Add(b4);
+
+            auto b5 = VBox(10.f);
+            b5->Add(DemoHead(L"Checkbox", L"多选：点文字也能勾，键盘 Space 可切"));
+            auto c1 = std::make_shared<Checkbox>(L"记住这次选择", true);
+            auto c2 = std::make_shared<Checkbox>(L"启动时自动检查更新", false);
+            auto c3 = std::make_shared<Checkbox>(L"禁用态示例", false);
+            c3->Enabled = false;
+            b5->Add(c1);
+            b5->Add(c2);
+            b5->Add(c3);
+            col->Add(b5);
+        } else if (tab == 1) {
+            auto b1 = VBox(10.f);
+            b1->Add(DemoHead(L"Switch", L"开关：滑块位置带缓动，切的是即时状态"));
+            auto srow = HBox(16.f);
+            srow->Cross = Stack::Center;
+            srow->Add(std::make_shared<Switch>(true));
+            srow->Add(L(L"开启状态", Type::Caption1));
+            auto srow2 = HBox(16.f);
+            srow2->Cross = Stack::Center;
+            srow2->Add(std::make_shared<Switch>(false));
+            srow2->Add(L(L"关闭状态", Type::Caption1));
+            b1->Add(srow);
+            b1->Add(srow2);
+            col->Add(b1);
+
+            auto b2 = VBox(10.f);
+            b2->Add(DemoHead(L"ListRow", L"列表行：标题 + 副标题 + 右侧文字，超长尾部省略"));
+            auto r1 = std::make_shared<ListRow>(L"这一条标题很长很长很长很长很长很长，用来验证尾部省略",
+                                                L"副标题写辅助信息", L"刚刚");
+            r1->Selected = true;
+            auto r2 = std::make_shared<ListRow>(L"第二条", L"未选中状态", L"2 天前");
+            auto r3 = std::make_shared<ListRow>(L"第三条", L"右侧文字可以用更弱的色阶", L"更早");
+            b2->Add(r1);
+            b2->Add(r2);
+            b2->Add(r3);
+            col->Add(b2);
+        } else {
+            auto b1 = VBox(10.f);
+            b1->Add(DemoHead(L"Button", L"主按钮 / 普通 / 禁用 / 带字形"));
+            auto brow = HBox(12.f);
+            brow->Cross = Stack::Center;
+            auto bt1 = std::make_shared<Button>(L"主按钮", true);
+            auto bt2 = std::make_shared<Button>(L"普通按钮");
+            auto bt3 = std::make_shared<Button>(L"禁用", false);
+            bt3->Enabled = false;
+            auto bt4 = std::make_shared<Button>(L"带图标");
+            bt4->Glyph = L"\xE768";
+            bt4->MinWidth = 120.f;
+            brow->Add(bt1);
+            brow->Add(bt2);
+            brow->Add(bt3);
+            brow->Add(bt4);
+            b1->Add(brow);
+            col->Add(b1);
+
+            auto b2 = VBox(10.f);
+            b2->Add(DemoHead(L"IconButton", L"Segoe MDL2 字形图标按钮，Ghost 模式无底色"));
+            auto irow = HBox(8.f);
+            irow->Cross = Stack::Center;
+            irow->Add(std::make_shared<IconButton>(L"\xE713"));
+            irow->Add(std::make_shared<IconButton>(L"\xE896"));
+            irow->Add(std::make_shared<IconButton>(L"\xE8B6"));
+            irow->Add(std::make_shared<IconButton>(L"\xE74D"));
+            b2->Add(irow);
+            col->Add(b2);
+
+            auto b3 = VBox(10.f);
+            b3->Add(DemoHead(L"Badge", L"五种色调，用于状态标记"));
+            auto badrow = HBox(8.f);
+            badrow->Cross = Stack::Center;
+            badrow->Add(std::make_shared<Badge>(L"中性", Badge::Neutral));
+            badrow->Add(std::make_shared<Badge>(L"强调", Badge::Accent));
+            badrow->Add(std::make_shared<Badge>(L"成功", Badge::Success));
+            badrow->Add(std::make_shared<Badge>(L"警告", Badge::Warning));
+            badrow->Add(std::make_shared<Badge>(L"危险", Badge::Danger));
+            b3->Add(badrow);
+            col->Add(b3);
+
+            auto b4 = VBox(10.f);
+            b4->Add(DemoHead(L"Progress", L"进度条：值变化带缓动，不是硬跳"));
+            for (int i = 0; i < 3; ++i) {
+                auto p = std::make_shared<Progress>(.25f + .25f * i);
+                p->W = 360.f;
+                b4->Add(p);
+            }
+            col->Add(b4);
+
+            auto b5 = VBox(10.f);
+            b5->Add(DemoHead(L"Label", L"文本：字号走 Type ramp，可设省略与对齐"));
+            auto ell = L(L"这一行很长很长很长很长很长很长，会被截断成省略号", Type::Body1);
+            ell->Ellipsis = true;
+            ell->W = 420.f;
+            b5->Add(ell);
+            col->Add(b5);
         }
-        listScroll->Add(rows);
-        content->Add(listScroll);
+
+        scroll->Add(col);
+        content->Add(scroll);
         content->StaggerIn();
     };
 
-    // 页面 3：设置（子导航：通用 / 外观 / Java / 下载 / 关于）
-    int setTab = 0;
-    std::function<void(int)> ShowSettings;
-    ShowSettings = [&](int tab) {
-        setTab = tab;
+    // ---------------- 页 2：布局 ----------------
+    int layTab = 0;
+    std::function<void(int)> ShowLayout;
+    ShowLayout = [&](int tab) {
+        layTab = tab;
         sub->Visible = true;
         sub->Clear();
-        const wchar_t* names[5] = { L"通用", L"外观", L"Java 运行时", L"下载", L"关于" };
-        const wchar_t* glyphs[5] = { L"\xE713", L"\xE771", L"\xE943", L"\xE896", L"\xE946" };
-        for (int i = 0; i < 5; ++i) {
-            auto n = std::make_shared<NavItem>(names[i], glyphs[i]);
+        const wchar_t* tabs[3] = { L"容器", L"栅格", L"滚动" };
+        const wchar_t* glyphs[3] = { L"\xE8A9", L"\xE80A", L"\xE8B5" };
+        for (int i = 0; i < 3; ++i) {
+            auto n = std::make_shared<NavItem>(tabs[i], glyphs[i]);
             n->Active = (i == tab);
-            n->Clicked = [&, i]() { if (setTab != i) { ShowSettings(i); app.Invalidate(); } };
+            n->Clicked = [&, i]() { if (layTab != i) { ShowLayout(i); app.Invalidate(); } };
             sub->Add(n);
         }
 
         content->Clear();
-        auto SwitchRow = [&](const std::wstring& label, bool on) {
-            auto fs = HBox(16.f);
-            fs->H = 48.f;
-            fs->Cross = Stack::Center;
-            auto lab = L(label, Type::Body1);
-            lab->W = 180.f;
-            fs->Add(lab);
-            fs->Add(std::make_shared<Switch>(on));
-            content->Add(fs);
-        };
+        content->Add(L(tabs[tab], Type::Subtitle1));
+        auto div = std::make_shared<Divider>();
+        div->MT = 14.f;
+        content->Add(div);
 
-        switch (tab) {
-        case 0:
-            content->Add(Section(L"启动器"));
-            content->Add(FormRow(L"语言", L"简体中文"));
+        if (tab == 0) {
+            content->Add(Section(L"VBox / HBox"));
+            content->Add(FormRow(L"一维容器", L"主轴按 Grow 分剩余空间，交叉轴可 Start/Center/End/Stretch"));
             content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"启动器版本", L"0.1.0  (dev)"));
+            content->Add(FormRow(L"间距", L"Gap 控制兄弟间距，Margin 与 Pad 分开算"));
             content->Add(std::make_shared<Divider>());
-            SwitchRow(L"启动器启动时检查更新", true);
-            content->Add(Section(L"游戏默认值"));
-            content->Add(FormRow(L"默认内存", L"4096 MB"));
+
+            content->Add(Section(L"Card"));
+            auto card = std::make_shared<Card>();
+            card->H = 116.f;
+            auto inbox = VBox(6.f);
+            inbox->Add(L(L"卡片：底色 + 圆角 + 描边 + 可选阴影", Type::Body1Strong));
+            inbox->Add(L(L"子项按普通 VBox 布局，Pad 不会撑破圆角", Type::Caption1));
+            card->Add(inbox);
+            content->Add(card);
+
+            auto note = L(L"Divider 在容器里是一根 1px 线，Vertical 时可竖着分栏。", Type::Caption1);
+            note->MT = 12.f;
+            content->Add(note);
+        } else if (tab == 1) {
+            content->Add(Section(L"Grid(3, 12)"));
+            auto grid = std::make_shared<Grid>(3, 12.f);
+            for (int i = 0; i < 6; ++i) {
+                auto cell = std::make_shared<Card>();
+                cell->H = 88.f;
+                auto c = VBox(4.f);
+                wchar_t b[32];
+                swprintf_s(b, L"格 %d", i + 1);
+                c->Add(L(b, Type::Body1Strong));
+                c->Add(L(L"等宽，行高取该行最高子项", Type::Caption1));
+                cell->Add(c);
+                grid->Add(cell);
+            }
+            content->Add(grid);
+
+            auto note = L(L"Grid 的 Desired 返回真实内容高度，父容器的剩余空间才不会算错。", Type::Caption1);
+            note->MT = 12.f;
+            content->Add(note);
+        } else {
+            content->Add(Section(L"ScrollView"));
+            auto scroll = std::make_shared<ScrollView>();
+            scroll->Grow = 1.f;
+            scroll->MT = 12.f;
+            auto rows = VBox(0.f);
+            for (int i = 0; i < 26; ++i) {
+                auto r = std::make_shared<ListRow>(L"可滚动内容", L"滚轮 / 拖滚动条 / 点轨道都能滚",
+                                                  L"行 " + std::to_wstring(i + 1));
+                r->H = 48.f;
+                rows->Add(r);
+                rows->Add(std::make_shared<Divider>());
+            }
+            scroll->Add(rows);
+            content->Add(scroll);
+            auto note = L(L"滚动条静止时是 2px 细线，悬停变粗；内容高度由子项自己算。", Type::Caption1);
+            note->MT = 8.f;
+            content->Add(note);
+        }
+        content->StaggerIn();
+    };
+
+    // ---------------- 页 3：主题 ----------------
+    int thmTab = 0;
+    std::function<void(int)> ShowTheme;
+    ShowTheme = [&](int tab) {
+        thmTab = tab;
+        sub->Visible = true;
+        sub->Clear();
+        const wchar_t* tabs[3] = { L"明暗", L"色板", L"动效" };
+        const wchar_t* glyphs[3] = { L"\xE706", L"\xE790", L"\xE804" };
+        for (int i = 0; i < 3; ++i) {
+            auto n = std::make_shared<NavItem>(tabs[i], glyphs[i]);
+            n->Active = (i == tab);
+            n->Clicked = [&, i]() { if (thmTab != i) { ShowTheme(i); app.Invalidate(); } };
+            sub->Add(n);
+        }
+
+        content->Clear();
+        content->Add(L(tabs[tab], Type::Subtitle1));
+        auto div = std::make_shared<Divider>();
+        div->MT = 14.f;
+        content->Add(div);
+
+        if (tab == 0) {
+            content->Add(Section(L"当前 Token"));
+            auto swrow = HBox(16.f);
+            swrow->H = 84.f;
+            auto cell = [&](const std::wstring& name, D2D1_COLOR_F c) {
+                auto col = VBox(6.f);
+                auto box = std::make_shared<Card>();
+                box->W = 44.f;
+                box->H = 40.f;
+                box->Fill = c;
+                box->Shadow = false;
+                box->Radius = 4.f;
+                col->Add(box);
+                col->Add(L(name, Type::Caption1));
+                return col;
+            };
+            const Tokens& tk = app.Th().t;
+            swrow->Add(cell(L"kp 卡片面", tk.kp));
+            swrow->Add(cell(L"bj 页面底", tk.bj));
+            swrow->Add(cell(L"xt 控件面", tk.xt));
+            swrow->Add(cell(L"accent", tk.accent));
+            swrow->Add(cell(L"text2 次要字", tk.text2));
+            swrow->Add(cell(L"divider", tk.divider));
+            content->Add(swrow);
+
+            content->Add(Section(L"切换"));
+            auto row = HBox(16.f);
+            row->H = 48.f;
+            row->Cross = Stack::Center;
+            row->Add(L(L"深色模式", Type::Body1));
+            auto sw = std::make_shared<Switch>(app.IsDark());
+            sw->Changed = [&app](bool on) { app.SetDark(on); app.Invalidate(); };
+            row->Add(sw);
+            content->Add(row);
+
+            auto note = L(L"SetDark 只换 Token，不重建控件树；已挂着的控件下一帧就按新色画。切完再点「重播入场」看效果。", Type::Caption1);
+            note->MT = 8.f;
+            content->Add(note);
+        } else if (tab == 1) {
+            content->Add(Section(L"色板切换"));
+            auto seg = std::make_shared<Segmented>(std::vector<std::wstring>{ L"Microsoft", L"GitHub" }, 0);
+            seg->W = 260.f;
+            seg->Changed = [&app, seg](int i) {
+                app.SetTheme(i == 1 ? Palette::GitHub : Palette::Microsoft, app.IsDark());
+                seg->Active = i;
+                app.Invalidate();
+            };
+            content->Add(seg);
+
+            content->Add(Section(L"强调色"));
+            auto swrow = HBox(12.f);
+            swrow->H = 40.f;
+            swrow->Cross = Stack::Center;
+            for (unsigned rgb : { 0x0F6CBDu, 0x0E7A6Bu, 0x6B4FD6u, 0xC13B7Eu, 0xD9772Au }) {
+                auto sw = std::make_shared<Widget>();
+                sw->W = 28.f;
+                sw->H = 28.f;
+                sw->Bg = Hex(rgb);
+                sw->Interactive = true;
+                D2D1_COLOR_F c = Hex(rgb);
+                sw->Clicked = [&app, c]() { app.SetAccent(c); app.Invalidate(); };
+                swrow->Add(sw);
+            }
+            content->Add(swrow);
+
+            auto note = L(L"SetAccent 会把 accent / accentSoft / accentSel 一起派生，控件不用改。", Type::Caption1);
+            note->MT = 12.f;
+            content->Add(note);
+        } else {
+            content->Add(Section(L"入场动画"));
+            auto replay = std::make_shared<Button>(L"重播入场", true);
+            replay->W = 140.f;
+            replay->Clicked = [&]() { content->StaggerIn(); app.Invalidate(); };
+            content->Add(replay);
+
+            content->Add(Section(L"参数"));
+            content->Add(FormRow(L"单项时长", L"252ms（Fluent 常用入场值）"));
             content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"默认游戏目录", L"版本目录（隔离）"));
-            break;
-        case 1:
-            content->Add(Section(L"外观"));
-            content->Add(FormRow(L"主题", L"跟随系统（浅色）"));
+            content->Add(FormRow(L"错峰步长", L"40ms，单页封顶 240ms"));
             content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"界面缩放", L"100%"));
+            content->Add(FormRow(L"缓动", L"cubic-bezier(0.1, 0.9, 0.2, 1)，起步快、收尾慢"));
             content->Add(std::make_shared<Divider>());
-            SwitchRow(L"窗口动画", true);
-            SwitchRow(L"紧凑列表行", false);
-            break;
-        case 2:
-            content->Add(Section(L"Java 运行时"));
-            content->Add(FormRow(L"当前版本", L"17.0.9  (x64)"));
-            content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"路径", L"C:\\Program Files\\Java\\jdk-17.0.9"));
-            content->Add(std::make_shared<Divider>());
-            SwitchRow(L"启动时自动检测 Java", true);
-            SwitchRow(L"允许使用系统内置 JRE", false);
-            break;
-        case 3:
-            content->Add(Section(L"下载"));
-            content->Add(FormRow(L"并发连接数", L"32"));
-            content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"下载源", L"BMCLAPI（镜像）"));
-            content->Add(std::make_shared<Divider>());
-            SwitchRow(L"下载完校验 SHA-1", true);
-            SwitchRow(L"失败自动重试 3 次", true);
-            break;
-        default:
-            content->Add(Section(L"关于"));
-            content->Add(FormRow(L"启动器", L"Void Craft Launcher 0.1.0"));
-            content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"UI 库", L"XGStudio-cpp-UI"));
-            content->Add(std::make_shared<Divider>());
-            content->Add(FormRow(L"许可证", L"AGPL-3.0"));
-            break;
+            content->Add(FormRow(L"开销", L"每帧只重绘自己那块脏区，静止后帧循环挂起"));
+
+            auto note = L(L"StaggerIn 遇 ScrollView 会下钻一层，所以列表是逐行出现的。", Type::Caption1);
+            note->MT = 12.f;
+            content->Add(note);
         }
         content->StaggerIn();
     };
@@ -343,10 +517,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         curPage = idx;
         content->Clear();
         switch (idx) {
-        case 0: BuildLaunch(); break;
-        case 1: ShowVersions(verTab); break;
-        case 2: BuildDownload(); break;
-        default: ShowSettings(setTab); break;
+        case 0: BuildOverview(); break;
+        case 1: ShowControls(ctlTab); break;
+        case 2: ShowLayout(layTab); break;
+        default: ShowTheme(thmTab); break;
         }
         app.Invalidate();
     };

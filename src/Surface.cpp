@@ -233,6 +233,11 @@ void Surface::SetDark(bool dark) {
     SetTheme(theme_.pal, dark);
 }
 
+void Surface::SetAccent(D2D1_COLOR_F a) {
+    theme_.SetAccent(a);       // 由 accent 派生 hover / press / soft / sel
+    Invalidate();
+}
+
 void Surface::AddOverlay(std::shared_ptr<Widget> w) {
     if (!w) return;
     AttachTree(w.get(), this, &g_);

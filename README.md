@@ -114,7 +114,7 @@ XGStudio-cpp-UI/
 ├─ demo/
 │  ├─ main.cpp            全控件展示
 │  ├─ minimal.cpp         最小用法示例
-│  └─ frame.cpp           自绘边框 + 启动器排版打样（TitleBar/Grid/滚动条/省略号）
+│  └─ frame.cpp           控件库展示程序（总览/控件/布局/主题，四页 + 子导航）
 ├─ tools/
 │  └─ layoutcheck.cpp     无窗口布局自检：打印节点 frame 并统计越界（VCUILayoutCheck）
 └─ CMakeLists.txt
@@ -411,7 +411,7 @@ row->FadeIn(.252f, 8.f, .12f);   // 单项 + 指定延迟
 | `VCUI_NOSHADOW=1` | 跳过阴影绘制，用于定位阴影开销 |
 | `VCUI_NOTEXT=1` | 跳过文字绘制，用于定位文字布局开销 |
 
-`VCUIDemo` 额外认两个变量，方便截图与无头复现：`VCUI_DEMO_DARK=1` 直接进深色，`VCUI_DEMO_PALETTE=github` 用 GitHub 色板。
+`VCUIFrameDemo`（控件库展示程序）额外认：`VCUI_DEMO_DARK=1` 深色、`VCUI_NAV_CENTER=1` 顶栏导航最小居中、`VCUI_PAGE=0..3` 指定启动页（总览/控件/布局/主题）。
 
 ## 已知未做
 
