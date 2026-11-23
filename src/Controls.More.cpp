@@ -98,20 +98,20 @@ void ListRow::Paint(PaintCtx& ctx) {
     float x = fr_.left + PL;
     float rightW = 0.f;
     if (!Right.empty()) {
-        rightW = (float)Right.size() * 12.f * 0.62f + 8.f;
+        rightW = Tw(Right, 12.f, 400) + 10.f;
         ctx.g.Text(D2D1_RECT_F{ fr_.right - PR - rightW, fr_.top, fr_.right - PR, fr_.bottom },
                    Right, 12.f, 400, t.text2, HAlign::Right, VAlign::Middle);
     }
 
     if (Sub.empty()) {
-        ctx.g.Text(D2D1_RECT_F{ x, fr_.top, fr_.right - PR - rightW, fr_.bottom },
-                   Title, 14.f, Selected ? 600 : 400, t.wz, HAlign::Left, VAlign::Middle);
+        ctx.g.TextTrim(D2D1_RECT_F{ x, fr_.top, fr_.right - PR - rightW, fr_.bottom },
+                       Title, 14.f, Selected ? 600 : 400, t.wz, HAlign::Left, VAlign::Middle);
     } else {
         float cy = (fr_.top + fr_.bottom) * .5f;
-        ctx.g.Text(D2D1_RECT_F{ x, cy - 20.f, fr_.right - PR - rightW, cy - 2.f },
-                   Title, 14.f, Selected ? 600 : 400, t.wz, HAlign::Left, VAlign::Bottom);
-        ctx.g.Text(D2D1_RECT_F{ x, cy + 1.f, fr_.right - PR - rightW, cy + 19.f },
-                   Sub, 12.f, 400, t.text2, HAlign::Left, VAlign::Top);
+        ctx.g.TextTrim(D2D1_RECT_F{ x, cy - 20.f, fr_.right - PR - rightW, cy - 2.f },
+                       Title, 14.f, Selected ? 600 : 400, t.wz, HAlign::Left, VAlign::Bottom);
+        ctx.g.TextTrim(D2D1_RECT_F{ x, cy + 1.f, fr_.right - PR - rightW, cy + 19.f },
+                       Sub, 12.f, 400, t.text2, HAlign::Left, VAlign::Top);
     }
 }
 

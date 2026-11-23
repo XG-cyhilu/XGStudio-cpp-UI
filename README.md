@@ -115,6 +115,8 @@ XGStudio-cpp-UI/
 │  ├─ main.cpp            全控件展示
 │  ├─ minimal.cpp         最小用法示例
 │  └─ frame.cpp           自绘边框 + 启动器排版打样（TitleBar/Grid/滚动条/省略号）
+├─ tools/
+│  └─ layoutcheck.cpp     无窗口布局自检：打印节点 frame 并统计越界（VCUILayoutCheck）
 └─ CMakeLists.txt
 ```
 

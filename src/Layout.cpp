@@ -47,6 +47,10 @@ D2D1_SIZE_F Stack::Desired(float availW, float availH) {
     float h = (Direction == Col ? mainSum : crossMax) + PT + PB;
     if (W > 0) w = W;
     if (H > 0) h = H;
+    // Desired 不该超过可用尺寸，否则父容器把这份"撑爆"的尺寸当基准，
+    // 兄弟/自身就被挤出窗口（Grow 分配的 freeSpace 会直接算成 0）。
+    if (availW > 0.f && w > availW) w = availW;
+    if (availH > 0.f && h > availH) h = availH;
     return D2D1::SizeF(w, h);
 }
 
@@ -92,6 +96,8 @@ void Stack::LayoutCol(D2D1_RECT_F in) {
         else if (Cross == End) ox = aw - cw - k->MR;
 
         D2D1_RECT_F fr{ in.left + k->ML + ox, y + k->MT, in.left + k->ML + ox + cw, y + k->MT + h };
+        // 兜底：任何子项都不许超出容器内容区，否则会把同一容器里的兄弟顶出窗口
+        if (fr.bottom > in.bottom) fr.bottom = in.bottom > fr.top ? in.bottom : fr.top;
         k->Arrange(fr);
         y = fr.bottom + k->MB + Gap;
     }
@@ -134,6 +140,7 @@ void Stack::LayoutRow(D2D1_RECT_F in) {
         else if (Cross == End) oy = ah - ch - k->MB;
 
         D2D1_RECT_F fr{ x + k->ML, in.top + k->MT + oy, x + k->ML + w, in.top + k->MT + oy + ch };
+        if (fr.right > in.right) fr.right = in.right > fr.left ? in.right : fr.left;
         k->Arrange(fr);
         x = fr.right + k->MR + Gap;
     }
@@ -225,24 +232,32 @@ void Divider::Paint(PaintCtx& ctx) {
 D2D1_SIZE_F Grid::Desired(float availW, float availH) {
     int cols = Cols > 0 ? Cols : 1;
     float aw = availW - PL - PR;
-    float cellW = cols > 1 ? (aw - GapX * float(cols - 1)) / float(cols) : aw;
-    if (cellW < 1.f) cellW = 1.f;
 
+    // 内容宽按"最宽的一列 × 列数"估：返回内容尺寸，不返回可用尺寸，
+    // 否则父容器的 Grow 分配会把 freeSpace 算成 0 并把兄弟挤出窗口。
+    float maxCell = 0.f;
     std::vector<float> rowH;
     int i = 0;
     for (auto& k : kids_) {
         if (!k->Visible) continue;
-        D2D1_SIZE_F d = k->Desired(cellW, availH - PT - PB);
+        D2D1_SIZE_F d = k->Desired(aw, availH - PT - PB);
+        float kw = k->W > 0 ? k->W : d.width;
+        maxCell = max(maxCell, kw + k->ML + k->MR);
         float kh = k->H > 0 ? k->H : d.height;
         kh += k->MT + k->MB;
         if (i % cols == 0) rowH.push_back(kh);
         else rowH.back() = max(rowH.back(), kh);
         ++i;
     }
+    float w = cols > 1 ? maxCell * float(cols) + GapX * float(cols - 1) : maxCell;
     float h = PT + PB;
     for (float v : rowH) h += v;
     if (rowH.size() > 1) h += GapY * float(rowH.size() - 1);
-    return D2D1::SizeF(W > 0 ? W : aw + PL + PR, H > 0 ? H : h);
+    float fw = W > 0 ? W : w + PL + PR;
+    float fh = H > 0 ? H : h;
+    if (availW > 0.f && fw > availW) fw = availW;
+    if (availH > 0.f && fh > availH) fh = availH;
+    return D2D1::SizeF(fw, fh);
 }
 
 void Grid::LayoutChildren() {
@@ -291,7 +306,15 @@ ScrollView::ScrollView() {
 }
 
 D2D1_SIZE_F ScrollView::Desired(float availW, float availH) {
-    return D2D1::SizeF(W > 0 ? W : availW, H > 0 ? H : availH);
+    // 取内容尺寸并夹到可用尺寸：返回"可用尺寸"会把父容器的 Grow 计算
+    // 带偏（父以为这个子项已经占满，freeSpace 直接变 0，兄弟被挤出窗口）。
+    float cw = availW, ch = availH;
+    if (!kids_.empty()) {
+        D2D1_SIZE_F d = kids_[0]->Desired(availW, availH);
+        cw = std::min(availW, d.width > 0.f ? d.width : availW);
+        ch = std::min(availH, d.height > 0.f ? d.height : availH);
+    }
+    return D2D1::SizeF(W > 0 ? W : cw, H > 0 ? H : ch);
 }
 
 float ScrollView::ViewHeight() const {
@@ -316,7 +339,7 @@ void ScrollView::LayoutChildren() {
     float gutter = ShowBar ? (BarW + 6.f) : 0.f;
     auto& content = kids_[0];
     float ch = content->H > 0 ? content->H
-                              : content->Desired(in.right - in.left - gutter, in.bottom - in.top).height;
+                              : content->Desired(in.right - in.left - gutter, 1e6f).height;
     float maxScroll = max(0.f, ch - (in.bottom - in.top));
     ScrollY = std::clamp(ScrollY, 0.f, maxScroll);
     TargetY = std::clamp(TargetY, 0.f, maxScroll);
@@ -408,11 +431,11 @@ D2D1_RECT_F ScrollView::ThumbRect() const {
 }
 
 void ScrollView::Paint(PaintCtx& ctx) {
-    if (!Visible) return;
-    if (!ShowBar || aBar <= .05f || MaxScroll() <= .5f) return;
+    if (!Visible || !ShowBar || MaxScroll() <= .5f) return;
+    // 静止时也是一条 2px 细线（alpha 压低），悬停/滚动时加粗到 BarW
     D2D1_RECT_F th = ThumbRect();
     D2D1_COLOR_F c = ctx.t.text3;
-    c.a = .55f * aBar;
+    c.a = .30f + .30f * aBar;
     ctx.g.RoundRect(th, (th.right - th.left) * .5f, c);
 }
 

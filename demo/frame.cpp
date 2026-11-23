@@ -45,7 +45,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     app.SetCustomFrame(true);        // 无边框：客户区吃掉整窗，标题栏自己画
     if (!app.Create(L"VCUI Frame Demo", 1180, 740, dark)) return 1;
 
-    auto root = std::make_shared<Widget>();
+    auto root = VBox(0.f);
 
     // ---- 标题栏 ----
     auto bar = std::make_shared<TitleBar>();
@@ -59,9 +59,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     body->Grow = 1.f;
 
     // 左栏
-    auto side = std::make_shared<Widget>();
+    auto side = VBox(0.f);
     side->W = 240.f;
     auto sideBox = VBox(0.f);
+    sideBox->Grow = 1.f;
     sideBox->Pad(12.f);
 
     auto folders = std::make_shared<Dropdown>(std::vector<std::wstring>{ L"主目录", L"D:\\Games\\MC-1.20" }, 0);
@@ -91,9 +92,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     side->Add(sideBox);
 
     // 主区
-    auto main = std::make_shared<Widget>();
+    auto main = VBox(0.f);
     main->Grow = 1.f;
     auto page = VBox(12.f);
+    page->Grow = 1.f;
     page->Pad(24.f);
 
     auto hero = std::make_shared<Card>();
