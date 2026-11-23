@@ -23,8 +23,9 @@ namespace vcui {
 class VCUI_API Label : public Widget {
 public:
     std::wstring Text;
-    float Size = 13.f;
+    float Size = 14.f;             // 默认 Body 1
     int Weight = 400;
+    float LineHeight = 0.f;        // 0 = 按 type ramp 自动取行高（14→20、32→40…）
     D2D1_COLOR_F Color{ 0, 0, 0, 0 };
     HAlign Align = HAlign::Left;
     VAlign VAlignMode = VAlign::Top;
@@ -32,8 +33,14 @@ public:
     bool Ellipsis = false;    // 单行超宽时尾部截断加「…」
 
     Label() = default;
-    explicit Label(std::wstring text, float size = 13.f, int weight = 400)
+    explicit Label(std::wstring text, float size = 14.f, int weight = 400)
         : Text(std::move(text)), Size(size), Weight(weight) {}
+
+    // 直接套 Fluent type ramp 的一档（自带字号/字重/行高）。
+    Label& UseType(const TypeStyle& s) {
+        Size = s.size; Weight = s.weight; LineHeight = s.lineHeight;
+        return *this;
+    }
 
     D2D1_SIZE_F Desired(float availW, float availH) override;
     void Paint(PaintCtx& ctx) override;

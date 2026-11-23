@@ -55,10 +55,41 @@ struct Tokens {
 struct Metrics {
     float radiusBtn = 2, radiusInput = 2, radiusCard = 8, radiusPanel = 8;
     float controlH = 34, rowH = 44, gap = 12, padCard = 24;
-    float fLabel = 12, fBody = 14, fSub = 20, fHeading = 28;
+    // 字号取 Fluent type ramp：Caption 1 = 12/16，Body 1 = 14/20，
+    // Subtitle 1 = 20/26，Title 2 = 28/36
+    float fCaption = 10, fLabel = 12, fBody = 14, fSub = 20, fHeading = 28, fTitle = 32;
     float borderW = 1.f;
     const wchar_t* family = L"Microsoft YaHei";
 };
+
+// Fluent type ramp 的一档。行高为绝对值（不是倍数），与官方 12/16、14/20… 对齐。
+struct TypeStyle {
+    float size, lineHeight;
+    int weight;              // 400 Regular / 600 Semibold / 700 Bold
+    const wchar_t* name;
+};
+
+namespace Type {
+    VCUI_API extern const TypeStyle Caption2;        // 10 / 14  Regular
+    VCUI_API extern const TypeStyle Caption2Strong;  // 10 / 14  Semibold
+    VCUI_API extern const TypeStyle Caption1;        // 12 / 16  Regular
+    VCUI_API extern const TypeStyle Caption1Strong;  // 12 / 16  Semibold
+    VCUI_API extern const TypeStyle Caption1Stronger;// 12 / 16  Bold
+    VCUI_API extern const TypeStyle Body1;           // 14 / 20  Regular
+    VCUI_API extern const TypeStyle Body1Strong;     // 14 / 20  Semibold
+    VCUI_API extern const TypeStyle Subtitle2;       // 16 / 22  Semibold
+    VCUI_API extern const TypeStyle Subtitle1;       // 20 / 26  Semibold
+    VCUI_API extern const TypeStyle Title3;          // 24 / 32  Semibold
+    VCUI_API extern const TypeStyle Title2;          // 28 / 36  Semibold
+    VCUI_API extern const TypeStyle Title1;          // 32 / 40  Semibold
+    VCUI_API extern const TypeStyle LargeTitle;      // 40 / 52  Semibold
+    VCUI_API extern const TypeStyle Display;         // 68 / 92  Semibold
+}
+
+// 任意字号的默认行高：落到 type ramp 最近的一档并按字号等比缩放。
+VCUI_API float LineH(float px);
+// 任意字号最接近的一档（用于取对应 weight）。
+VCUI_API TypeStyle TypeFor(float px);
 
 VCUI_API Tokens GetTokens(Palette p, bool dark);
 VCUI_API Metrics GetMetrics();

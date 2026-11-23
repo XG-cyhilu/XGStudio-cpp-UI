@@ -261,13 +261,38 @@ Token 命名沿用拼音缩写（历史原因），对照如下。表中前四�
 | `pressed` | 按压叠色 | 悬停底混向主文字 7% | 同左，8% |
 | `panel` | 卡面与页面之间的过渡面 | 卡面混向背景 14% | 同左 |
 
-`Theme::m` 是 Fluent 2 度量（圆角、控件高、行高、字号、字体族、描边宽度），改这里就能整体换皮：`radiusBtn/radiusInput/radiusCard/radiusPanel`、`controlH/rowH/gap/padCard`、`fLabel/fBody/fSub/fHeading`、`borderW`、`family`。
+`Theme::m` 是 Fluent 2 度量（圆角、控件高、行高、字号、字体族、描边宽度），改这里就能整体换皮：`radiusBtn/radiusInput/radiusCard/radiusPanel`、`controlH/rowH/gap/padCard`、`fCaption/fLabel/fBody/fSub/fHeading/fTitle`、`borderW`、`family`。
+
+### 排版（Fluent type ramp）
+
+字号不是裸数字，而是走官方 type ramp：每档自带**字号 / 字重 / 行高**，`Label` 默认按字号自动取行高（`VCUI::LineH(px)`），所以 32px 标题的行高是 40 而不是 1.55 倍。
+
+```cpp
+using namespace vcui;
+auto title = std::make_shared<Label>(L"1.20.4", Type::Title1.size, Type::Title1.weight);
+title->LineHeight = Type::Title1.lineHeight;   // 32 / 40 Semibold
+// 或一步到位：
+auto t2 = std::make_shared<Label>();
+t2->UseType(Type::Body1);                      // 14 / 20 Regular
+```
+
+| 档 | 字号/行高 | 字重 | 用途 |
+|---|---|---|---|
+| `Caption2` | 10 / 14 | 400 | 角标、极小注脚 |
+| `Caption1` / `Caption1Strong` / `Caption1Stronger` | 12 / 16 | 400 / 600 / 700 | 辅助文字、表格副值 |
+| `Body1` / `Body1Strong` | 14 / 20 | 400 / 600 | 正文、表单值 |
+| `Subtitle2` | 16 / 22 | 600 | 小标题 |
+| `Subtitle1` | 20 / 26 | 600 | 区块标题 |
+| `Title3` / `Title2` / `Title1` | 24 / 32、28 / 36、32 / 40 | 600 | 页面/实例主标题 |
+| `LargeTitle` / `Display` | 40 / 52、68 / 92 | 600 | 大屏头图 |
+
+非标准字号（13、17…）也有 `TypeFor(px)` 兜底：落到最近一档并按比例缩放行高。文案遵循 Fluent 的内容规范——用句式大小写（sentence case），不用全大写博眼球。
 
 ## 控件
 
 | 控件 | 关键字段 / 回调 |
 |---|---|
-| `Label` | `Text`、`Size`、`Weight`、`Color`、`Align`、`VAlignMode`、`Wrap`、`Ellipsis`（超宽尾截断加「…」） |
+| `Label` | `Text`、`Size`、`Weight`、`LineHeight`(0=按 type ramp)、`UseType(Type::Body1)`、`Color`、`Align`、`VAlignMode`、`Wrap`、`Ellipsis`（超宽尾截断加「…」） |
 | `Button` | `Text`、`Glyph`(Segoe MDL2)、`Primary`、`MinWidth`、`Clicked` |
 | `Checkbox` | `On`、`Text`、`Changed(bool)` |
 | `Switch` | `On`、`Changed(bool)` |

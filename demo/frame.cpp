@@ -24,14 +24,21 @@
 
 using namespace vcui;
 
+// 文字一律走 Fluent type ramp：字号 / 字重 / 行高成套拿
+static std::shared_ptr<Label> L(std::wstring s, const TypeStyle& sty) {
+    auto l = std::make_shared<Label>(std::move(s), sty.size, sty.weight);
+    l->LineHeight = sty.lineHeight;
+    return l;
+}
+
 // 平坦内容区的一行：左标签 + 右值，最后跟一条分隔线
 static std::shared_ptr<Widget> FormRow(const std::wstring& label, const std::wstring& value) {
     auto row = HBox(16.f);
     row->H = 48.f;
     row->Cross = Stack::Center;
-    auto l = std::make_shared<Label>(label, 14.f, 400);
+    auto l = L(label, Type::Body1);
     l->W = 180.f;
-    auto v = std::make_shared<Label>(value, 14.f, 600);
+    auto v = L(value, Type::Body1Strong);
     v->Grow = 1.f;
     v->Ellipsis = true;
     row->Add(l);
@@ -40,7 +47,7 @@ static std::shared_ptr<Widget> FormRow(const std::wstring& label, const std::wst
 }
 
 static std::shared_ptr<Widget> Section(const std::wstring& title) {
-    auto s = std::make_shared<Label>(title, 20.f, 600);
+    auto s = L(title, Type::Subtitle1);
     s->MT = 8.f;
     return s;
 }
@@ -90,9 +97,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         sub->Visible = false;
 
         auto head = HBox(16.f);
-        head->H = 52.f;
+        head->H = 44.f;
         head->Cross = Stack::Center;
-        auto ver = std::make_shared<Label>(L"1.20.4", 32.f, 600);
+        auto ver = L(L"1.20.4", Type::Title1);
         ver->Grow = 1.f;
         auto play = std::make_shared<Button>(L"启动游戏", true);
         play->W = 160.f;
@@ -106,7 +113,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         head->Add(play);
         content->Add(head);
 
-        auto subline = std::make_shared<Label>(L"Fabric 0.15.11   ·   上次游玩 2 小时前   ·   累计 37 小时", 14.f, 400);
+        auto subline = L(L"Fabric 0.15.11   ·   上次游玩 2 小时前   ·   累计 37 小时", Type::Body1);
         subline->MT = 8.f;
         subline->Ellipsis = true;
         content->Add(subline);
@@ -128,7 +135,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         content->Add(d3);
         content->Add(FormRow(L"加载器", L"Fabric 0.15.11"));
 
-        auto lt = std::make_shared<Label>(L"最近日志", 20.f, 600);
+        auto lt = L(L"最近日志", Type::Subtitle1);
         lt->MT = 28.f;
         content->Add(lt);
 
@@ -139,7 +146,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         for (int i = 0; i < 30; ++i) {
             wchar_t b[160];
             swprintf_s(b, L"[12:%02d:%02d] [INFO] 校验 assets/objects/%02x/%04d  正常", i, (i * 7) % 60, i % 256, i * 13);
-            auto line = std::make_shared<Label>(b, 12.f, 400);
+            auto line = L(b, Type::Caption1);
             line->Ellipsis = true;
             logBox->Add(line);
         }
@@ -160,9 +167,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         sub->Add(n3);
 
         auto head = HBox(12.f);
-        head->H = 52.f;
+        head->H = 44.f;
         head->Cross = Stack::Center;
-        auto t = std::make_shared<Label>(L"已安装的版本", 20.f, 600);
+        auto t = L(L"已安装的版本", Type::Subtitle1);
         t->Grow = 1.f;
         auto search = std::make_shared<Input>(L"搜索版本…");
         search->W = 240.f;
@@ -195,7 +202,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     auto BuildDownload = [&]() {
         sub->Visible = false;
 
-        auto t = std::make_shared<Label>(L"下载队列", 20.f, 600);
+        auto t = L(L"下载队列", Type::Subtitle1);
         content->Add(t);
 
         auto div = std::make_shared<Divider>();
@@ -210,12 +217,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             auto row = HBox(12.f);
             wchar_t name[96];
             swprintf_s(name, L"libraries\\com\\mojang\\%d.0.3\\asset-%d.jar", i, i);
-            auto n = std::make_shared<Label>(name, 13.f, 400);
+            auto n = L(name, Type::Body1);
             n->Grow = 1.f;
             n->Ellipsis = true;
             wchar_t pct[32];
             swprintf_s(pct, L"%d%%", 10 + i * 15);
-            auto p = std::make_shared<Label>(pct, 13.f, 400);
+            auto p = L(pct, Type::Caption1);
             row->Add(n);
             row->Add(p);
             auto bar = std::make_shared<Progress>(0.1f + 0.15f * i);
@@ -247,7 +254,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         auto fs = HBox(16.f);
         fs->H = 48.f;
         fs->Cross = Stack::Center;
-        auto lab = std::make_shared<Label>(L"启动器启动时检查更新", 14.f, 400);
+        auto lab = L(L"启动器启动时检查更新", Type::Body1);
         lab->W = 180.f;
         auto sw = std::make_shared<Switch>(true);
         fs->Add(lab);

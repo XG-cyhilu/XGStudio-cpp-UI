@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ namespace vcui {
 D2D1_SIZE_F Label::Desired(float availW, float availH) {
     (void)availH;
     float w = W > 0 ? W : Tw(Text, Size, Weight);
-    float h = H > 0 ? H : Size * 1.55f;
+    float h = H > 0 ? H : (LineHeight > 0.f ? LineHeight : LineH(Size));
     return D2D1::SizeF(w, h);
 }
 
@@ -291,7 +291,7 @@ void Input::Paint(PaintCtx& ctx) {
 
     float pad = 12.f;
     D2D1_RECT_F tr{ fr_.left + pad, fr_.top, fr_.right - pad, fr_.bottom };
-    float textY = fr_.top + ((fr_.bottom - fr_.top) - m.fBody * 1.4f) * .5f;
+    float textY = fr_.top + ((fr_.bottom - fr_.top) - LineH(m.fBody)) * .5f;
 
     if (Text.empty() && !Placeholder.empty() && comp_.empty()) {
         ctx.g.Text(tr, Placeholder, m.fBody, 400, t.text2, HAlign::Left, VAlign::Middle);
@@ -302,7 +302,7 @@ void Input::Paint(PaintCtx& ctx) {
     if (lo != hi && !Text.empty()) {
         float x1 = tr.left + Tw(Text.substr(0, (size_t)lo), m.fBody, 400);
         float x2 = tr.left + Tw(Text.substr(0, (size_t)hi), m.fBody, 400);
-        ctx.g.FillRect(D2D1_RECT_F{ x1, textY - 2.f, x2, textY + m.fBody * 1.4f + 2.f },
+        ctx.g.FillRect(D2D1_RECT_F{ x1, textY - 2.f, x2, textY + LineH(m.fBody) + 2.f },
                        A(t.accent, .28f));
     }
 
@@ -321,7 +321,7 @@ void Input::Paint(PaintCtx& ctx) {
 
     if (Focus && blinkOn_) {
         float top = textY - 1.f;
-        ctx.g.Line(caretX + .5f, top, caretX + .5f, top + m.fBody * 1.4f + 2.f, t.wz, 1.f);
+        ctx.g.Line(caretX + .5f, top, caretX + .5f, top + LineH(m.fBody) + 2.f, t.wz, 1.f);
     }
 }
 

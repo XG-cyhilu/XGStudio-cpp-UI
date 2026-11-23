@@ -16,6 +16,8 @@
 
 #include "vcui/Color.h"
 
+#include <cmath>
+
 namespace vcui {
 
 Tokens GetTokens(Palette p, bool dark) {
@@ -49,10 +51,50 @@ Metrics GetMetrics() {
     Metrics m;
     m.radiusBtn = 2; m.radiusInput = 2; m.radiusCard = 8; m.radiusPanel = 8;
     m.controlH = 34; m.rowH = 44; m.gap = 12; m.padCard = 24;
-    m.fLabel = 12; m.fBody = 14; m.fSub = 20; m.fHeading = 28;
+    m.fCaption = 10; m.fLabel = 12; m.fBody = 14; m.fSub = 20; m.fHeading = 28; m.fTitle = 32;
     m.borderW = 1.f;
     m.family = L"Microsoft YaHei";
     return m;
 }
+
+namespace Type {
+const TypeStyle Caption2        { 10.f, 14.f, 400, L"Caption 2" };
+const TypeStyle Caption2Strong  { 10.f, 14.f, 600, L"Caption 2 Strong" };
+const TypeStyle Caption1        { 12.f, 16.f, 400, L"Caption 1" };
+const TypeStyle Caption1Strong  { 12.f, 16.f, 600, L"Caption 1 Strong" };
+const TypeStyle Caption1Stronger{ 12.f, 16.f, 700, L"Caption 1 Stronger" };
+const TypeStyle Body1           { 14.f, 20.f, 400, L"Body 1" };
+const TypeStyle Body1Strong     { 14.f, 20.f, 600, L"Body 1 Strong" };
+const TypeStyle Subtitle2       { 16.f, 22.f, 600, L"Subtitle 2" };
+const TypeStyle Subtitle1       { 20.f, 26.f, 600, L"Subtitle 1" };
+const TypeStyle Title3          { 24.f, 32.f, 600, L"Title 3" };
+const TypeStyle Title2          { 28.f, 36.f, 600, L"Title 2" };
+const TypeStyle Title1          { 32.f, 40.f, 600, L"Title 1" };
+const TypeStyle LargeTitle      { 40.f, 52.f, 600, L"Large Title" };
+const TypeStyle Display         { 68.f, 92.f, 600, L"Display" };
+}
+
+TypeStyle TypeFor(float px) {
+    static const TypeStyle ramp[] = {
+        Type::Caption2, Type::Caption1, Type::Body1, Type::Subtitle2, Type::Subtitle1,
+        Type::Title3, Type::Title2, Type::Title1, Type::LargeTitle, Type::Display,
+    };
+    const TypeStyle* best = &ramp[0];
+    float d = 1e9f;
+    for (const auto& s : ramp) {
+        float cur = std::abs(s.size - px);
+        if (cur < d) { d = cur; best = &s; }
+    }
+    TypeStyle r = *best;
+    if (px != r.size && r.size > 0.f) {      // 非标准字号，按比例缩放行高
+        float k = px / r.size;
+        r.size = px;
+        r.lineHeight = r.lineHeight * k;
+    }
+    r.name = best->name;
+    return r;
+}
+
+float LineH(float px) { return TypeFor(px).lineHeight; }
 
 } // namespace vcui
