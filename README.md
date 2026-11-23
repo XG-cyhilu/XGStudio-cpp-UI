@@ -171,7 +171,7 @@ return vcui::CreateAppWindow(o);
 | `Switch` | `On`、`Changed(bool)`；滑块位置带缓动 |
 | `Input` | `Text`、`Placeholder`、`Caret`、`SelAnchor`、`MaxWidth`、`Changed(str)`、`Submitted` |
 | `Slider` | `Value`(0..1)、`Changed(float)`；点轨道即吸附，键盘可步进 |
-| `Progress` | `Value`(0..1)，值变化带缓动 |
+| `Progress` | `Value`(0..1)，值变化带缓动；`Indeterminate = true` 切不确定态——一段 accent 在轨道里来回循环，不用手动喂进度 |
 | `Segmented` | `Items`、`Active`、`Changed(int)`；选中胶囊在段间滑动 |
 | `Badge` | `Text`、`ToneKind`（Neutral / Accent / Success / Warning / Danger） |
 | `NavItem` | `Text`、`Glyph`、`Active`、`Clicked`；**同一父容器下自动构成单选组**（点谁谁亮、兄弟熄灭） |
@@ -383,6 +383,15 @@ row->FadeIn(.252f, 8.f, .12f);   // 单项 + 指定延迟
 - `StaggerIn` 给直接子项依次加延迟；遇到 `ScrollView` 会下钻一层，让列表里**每一行**各自错峰
 - 会自动 `PlayAnim()` 唤醒帧循环；不调它的话循环在静止状态是睡着的
 - 每项动画都会把自己标成 `AnimDirty`，`Tick` 只重绘那一块（含 28px 阴影余量）
+
+一部分控件自带持续动画，不需要外部驱动：
+
+```cpp
+auto p = std::make_shared<Progress>();
+p->Indeterminate = true;    // 不确定态：一段 accent 在轨道里左右往返（单趟 1s），Value 不参与绘制
+```
+
+`Indeterminate` 打开后 `Progress::Update` 每帧都返回 true，所在窗口会一直保持 60fps（其它控件都静止也不会睡）。这是预期行为——不确定进度本来就是持续动画。切页 / 销毁后自动恢复空闲。
 
 ## 自定义控件
 

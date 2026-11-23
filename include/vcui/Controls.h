@@ -170,6 +170,10 @@ class VCUI_API Progress : public Widget {
 public:
     float Value = .42f;
     float aVal = -1.f;
+    // 不确定进度：一段 accent 在轨道里来回循环扫过，Value 不参与绘制。
+    // 打开后控件每帧都标脏，所以所在页面会一直保持 60fps（没有别的动画时也不会睡）。
+    bool Indeterminate = false;
+    float Phase = 0.f;                  // 循环相位 0..1，Indeterminate 时按 dt 自走
     Progress() { H = 6.f; }
     explicit Progress(float v) : Value(v) { H = 6.f; }
 

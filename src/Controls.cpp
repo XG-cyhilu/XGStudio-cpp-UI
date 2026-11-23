@@ -672,6 +672,13 @@ D2D1_SIZE_F Progress::Desired(float availW, float availH) {
 }
 
 bool Progress::Update(float dt) {
+    if (Indeterminate) {
+        Widget::Update(dt);
+        Phase += dt / 2.f;             // 来回一趟 2s（去 1s + 回 1s），跟 Fluent 的不确定节奏接近
+        if (Phase >= 1.f) Phase -= 1.f;
+        AnimDirty = true;
+        return true;                   // 循环进度是持续动画：让帧循环别睡
+    }
     bool changed = Widget::Update(dt);
     if (aVal < 0.f) aVal = Value;
     if (std::abs(aVal - Value) > .0005f) {
@@ -686,9 +693,24 @@ bool Progress::Update(float dt) {
 
 void Progress::Paint(PaintCtx& ctx) {
     const Tokens& t = ctx.t;
-    float v = aVal < 0.f ? Value : aVal;
     float rad = 2.f;
     ctx.g.RoundRect(fr_, rad, Mix(t.wz, t.bj, .82f));
+
+    if (Indeterminate) {
+        // 一段 accent 在轨道里左右往返，两端各留一小截在轨道内（不会整根消失后再冒出来），
+        // 走出轨道的那部分靠裁剪吃掉，所以边缘是干净的直切而不是硬跳。
+        float w = fr_.right - fr_.left;
+        float segW = std::clamp(w * .30f, 24.f, w);       // 段长约 30%，短条也不会小到看不见
+        float eased = .5f - .5f * std::cos(Phase * 6.2831853f);   // 往返一趟，两端自然减速
+        float x0 = fr_.left - segW * .65f + (w + segW * .30f) * eased;
+        D2D1_RECT_F seg{ x0, fr_.top, x0 + segW, fr_.bottom };
+        ctx.g.PushClip(fr_);
+        ctx.g.RoundRect(seg, (fr_.bottom - fr_.top) > 4.f ? (fr_.bottom - fr_.top) * .5f : rad, t.accent);
+        ctx.g.PopClip();
+        return;
+    }
+
+    float v = aVal < 0.f ? Value : aVal;
     if (v > 0.f) {
         D2D1_RECT_F f = fr_;
         f.right = fr_.left + (fr_.right - fr_.left) * v;

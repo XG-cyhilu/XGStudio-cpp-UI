@@ -294,12 +294,18 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             col->Add(b3);
 
             auto b4 = VBox(10.f);
-            b4->Add(DemoHead(L"Progress", L"进度条：值变化带缓动，不是硬跳"));
-            for (int i = 0; i < 3; ++i) {
-                auto p = std::make_shared<Progress>(.25f + .25f * i);
-                p->W = 360.f;
-                b4->Add(p);
-            }
+            b4->Add(DemoHead(L"Progress",
+                             L"定值进度带缓动（30% / 72%）；第三行是不确定态，accent 在轨道里循环扫过"));
+            auto p1 = std::make_shared<Progress>(.30f);
+            p1->W = 360.f;
+            auto p2 = std::make_shared<Progress>(.72f);
+            p2->W = 360.f;
+            auto p3 = std::make_shared<Progress>();
+            p3->Indeterminate = true;      // 循环态：Phase 自己走，帧循环不会睡
+            p3->W = 360.f;
+            b4->Add(p1);
+            b4->Add(p2);
+            b4->Add(p3);
             col->Add(b4);
 
             auto b5 = VBox(10.f);
