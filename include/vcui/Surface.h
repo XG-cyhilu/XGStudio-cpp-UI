@@ -26,7 +26,7 @@ public:
     Surface();
     ~Surface();
 
-    // title 为空时用 L"Void Craft UI"
+    // title 为空时系统拿窗口类名 VCUISurface 当标题
     bool Create(const std::wstring& title, int width, int height, bool dark = false);
     // 窗口最小尺寸（DIP），Create 之前或之后都可调用
     void SetMinSize(int w, int h) { minW_ = w; minH_ = h; }

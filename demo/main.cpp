@@ -48,7 +48,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     Surface app;
-    if (!app.Create(L"Void Craft UI — Controls", 1180, 840, false)) return 1;
+    if (!app.Create(L"XGStudio-cpp-UI — Controls", 1180, 840, false)) return 1;
 
     // 启动状态可由环境变量指定，便于截图与无头复现：
     //   VCUI_DEMO_DARK=1        直接进深色
@@ -70,7 +70,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     header->PL = 24.f; header->PR = 24.f; header->PT = 16.f; header->PB = 12.f;
 
     auto brand = VBox(2.f);
-    brand->Add(std::make_shared<Label>(L"Void Craft UI", 24.f, 600));
+    brand->Add(std::make_shared<Label>(L"XGStudio-cpp-UI", 24.f, 600));
     brand->Add(std::make_shared<Label>(L"控件库 · Fluent 2 · Direct2D 自绘", 12.f, 400));
     header->Add(brand);
     header->Add(Spacer());

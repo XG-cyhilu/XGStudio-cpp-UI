@@ -16,7 +16,7 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# Void Craft UI
+# XGStudio-cpp-UI
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%201703%2B-lightgrey)
@@ -25,6 +25,10 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 
 C++17 / Direct2D + DirectWrite + Win32 的**全自绘**控件库。窗口里没有任何系统控件——没有 `EDIT`、没有 `COMBOBOX`、没有 `BUTTON`，每一像素都是 `vcui::Gfx` 用 Direct2D 画出来的。设计语言是单一 Fluent 2 底座（度量参数化），一套 `Theme`（Token + Metrics + accent），浅/深两档 × Microsoft / GitHub 两套色板。
+
+> **关于命名**：项目对外名是 **XGStudio-cpp-UI**（仓库/文档/示例标题都用它）。代码侧的标识符仍是
+> `vcui`：命名空间 `vcui`、CMake 目标 `VCUI::vcui`、产物 `vcui.lib`、宏 `VCUI_*`、环境变量 `VCUI_FPS`
+> 等。这样改名不会打断已经在链接它的工程，`find_package(VCUI)` 也照旧可用。
 
 浅色（截图里「+」图标按钮处于悬停，「默认按钮」处于按下）：
 
@@ -43,7 +47,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     Surface app;
-    if (!app.Create(L"Void Craft UI", 520, 340)) return 1;
+    if (!app.Create(L"XGStudio-cpp-UI", 520, 340)) return 1;
 
     auto page = VBox(14.f);
     page->Pad(24.f);
@@ -96,7 +100,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 ## 目录
 
 ```
-VCUI/
+XGStudio-cpp-UI/
 ├─ include/vcui/          公开头文件（只有这里需要给调用方）
 │  ├─ vcui.h              单头入口
 │  ├─ Color.h             颜色工具 + Tokens / Metrics / Palette
@@ -143,7 +147,7 @@ CMake 选项：
 ### 1) 源码内嵌（推荐）
 
 ```cmake
-add_subdirectory(path/to/VCUI)
+add_subdirectory(path/to/XGStudio-cpp-UI)
 target_link_libraries(YourApp PRIVATE VCUI::vcui)
 ```
 

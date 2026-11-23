@@ -24,12 +24,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     Surface app;
-    if (!app.Create(L"Void Craft UI — Minimal", 520, 340, false)) return 1;
+    if (!app.Create(L"XGStudio-cpp-UI — Minimal", 520, 340, false)) return 1;
 
     auto page = VBox(14.f);
     page->Pad(24.f);
 
-    page->Add(std::make_shared<Label>(L"Void Craft UI", 20.f, 600));
+    page->Add(std::make_shared<Label>(L"XGStudio-cpp-UI", 20.f, 600));
     page->Add(std::make_shared<Label>(L"一个窗口，一棵控件树，没有系统控件。", 12.f, 400));
 
     auto card = std::make_shared<Card>();

@@ -1,8 +1,8 @@
 {
-  "name": "vcui",
+  "name": "xgstudio-cpp-ui",
   "version": "1.0.0",
-  "description": "Void Craft UI - 100% self-drawn Direct2D widget library for Windows",
-  "homepage": "https://github.com/XG-cyhilu/Void-Craft-UI",
+  "description": "XGStudio-cpp-UI - 100% self-drawn Direct2D widget library for Windows",
+  "homepage": "https://github.com/XG-cyhilu/XGStudio-cpp-UI",
   "license": "Apache-2.0",
   "supports": "windows",
   "dependencies": []

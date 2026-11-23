@@ -15,9 +15,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20)
-project(VCUI VERSION 1.0.0 LANGUAGES CXX)
+project(XGStudio-cpp-UI VERSION 1.0.0 LANGUAGES CXX)
 
-# Void Craft UI —— C++ / Direct2D + Win32 + DirectWrite 的自绘控件库
+# XGStudio-cpp-UI —— C++ / Direct2D + Win32 + DirectWrite 的自绘控件库
 #
 # 选项：
 #   VCUI_BUILD_SHARED  构建 DLL（默认静态库）
