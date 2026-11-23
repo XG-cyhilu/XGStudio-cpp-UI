@@ -153,6 +153,8 @@ public:
     void Paint(PaintCtx& ctx) override;
     bool Update(float dt) override;
     void OnPress() override;
+    // 按下即跳到该位置（Fluent 滑块行为），否则只能先按住再拖
+    void OnPressAt(float x, float y) override;
     void OnDrag(float x, float y);
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     bool Focusable() const override { return true; }

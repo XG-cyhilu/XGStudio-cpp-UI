@@ -577,16 +577,19 @@ void Slider::Paint(PaintCtx& ctx) {
     const Tokens& t = ctx.t;
     float cy = (fr_.top + fr_.bottom) * .5f;
     float th = 4.f;
-    D2D1_RECT_F tr{ fr_.left, cy - th * .5f, fr_.right, cy + th * .5f };
+    // 轨道与滑点同域：两端各内缩 pad（约等于滑点半径），
+    // 这样 Value=0 时滑点正好压在轨道起点，不会在蓝条前面留一段空灰条。
+    float pad = 8.f;
+    D2D1_RECT_F tr{ fr_.left + pad, cy - th * .5f, fr_.right - pad, cy + th * .5f };
+    if (tr.right <= tr.left) tr = D2D1_RECT_F{ fr_.left, cy - th * .5f, fr_.right, cy + th * .5f };
     ctx.g.RoundRect(tr, th * .5f, Mix(t.wz, t.bj, .82f));
 
-    float pad = 8.f;
-    float span = (tr.right - tr.left) - pad * 2.f;
-    float x = tr.left + pad + span * Value;
+    float span = tr.right - tr.left;
+    float x = tr.left + span * Value;
 
     float kr = 7.f * (1.f + .22f * aHoverScale);
-    if (x > tr.left + pad)
-        ctx.g.RoundRect(D2D1_RECT_F{ tr.left + pad, cy - th * .5f, x, cy + th * .5f }, th * .5f,
+    if (x > tr.left)
+        ctx.g.RoundRect(D2D1_RECT_F{ tr.left, cy - th * .5f, x, cy + th * .5f }, th * .5f,
                         t.accent);
 
     if (Enabled) {
@@ -599,6 +602,11 @@ void Slider::Paint(PaintCtx& ctx) {
 
 void Slider::OnPress() {
     Press = true;
+}
+
+void Slider::OnPressAt(float x, float) {
+    Press = true;
+    if (Enabled) OnDrag(x, 0.f);   // 按下就吸附到该处，再继续拖
 }
 
 void Slider::OnDrag(float x, float) {
