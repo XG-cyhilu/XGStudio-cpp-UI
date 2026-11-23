@@ -375,13 +375,17 @@ public:
 控件级动画（当前：切页入场）
 
 ```cpp
-content->FadeIn(.18f, 10.f);   // 180ms 淡入 + 从下方 10px 上浮落位
+content->StaggerIn();            // 默认：单项 252ms，行间错峰 40ms（上限 240ms）
+content->FadeIn(.252f, 8.f);     // 或者整块一起入场
+row->FadeIn(.252f, 8.f, .12f);   // 单项 + 指定延迟
 ```
 
-- `FadeIn(dur, dy)` 会把 `Opacity` 由 0 推到 1（ease-out cubic，贴近 Fluent 的 decelerate），同时临时改写 `MT` 做位移，动画结束时两个字段都精确恢复原值
+- 时长为**每个控件**从出现到归位的时间，252ms 是 Fluent 的常用入场值；错峰后整页总时长 = 252ms + 最后一项延迟
+- 缓动是 `EaseDecelerate(p)`，即 `cubic-bezier(0.1, 0.9, 0.2, 1)`：起步快、收尾慢；按 x 反解贝塞尔参数后取 y，实测 e(0)=0、e(0.5)=0.97、e(1)=1
+- `FadeIn(dur, dy, delay)` 把 `Opacity` 从 0 推到 1，同时临时改写 `MT` 做位移；延迟期内保持透明，动画结束时两个字段都精确恢复原值
+- `StaggerIn` 给直接子项依次加延迟；遇到 `ScrollView` 会下钻一层，让列表里**每一行**各自错峰
 - 会自动 `PlayAnim()` 唤醒帧循环；不调它的话循环在静止状态是睡着的
-- 每一项动画都会把自己标成 `AnimDirty`，`Surface::Tick` 只重绘那一块（含 28px 阴影余量）
-- 想连子项逐个入场，给每行单独 `FadeIn` 并错开开始时间即可（目前不支持 delay，需要自己用 `AnimT` 起手）
+- 每项动画都会把自己标成 `AnimDirty`，`Surface::Tick` 只重绘那一块（含 28px 阴影余量）
 
 ## 性能
 

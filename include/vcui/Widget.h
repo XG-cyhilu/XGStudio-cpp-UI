@@ -80,10 +80,15 @@ public:
     virtual bool Update(float dt);
 
     // ---- 入场动画（切页用）：淡入 + 可选向下位移 ----
+    // 单控件从出现到归位 dur 秒（Fluent 常用 252ms），delay 为其单独延后。
     // dy > 0 时从"上方 dy 像素处"落位，MT 每帧被改写，动画结束后恢复原值。
-    void FadeIn(float dur = .18f, float dy = 0.f);
+    void FadeIn(float dur = .252f, float dy = 0.f, float delay = 0.f);
+    // 错峰入场：给直接子项依次加 step 延迟（滚动列表则作用于里面每一行），
+    // 每项自身的入场时长仍是 dur，总时长 = dur + 最后一项的延迟。
+    void StaggerIn(float dur = .252f, float dy = 8.f, float step = .04f, float maxDelay = .24f);
     float AnimT = -1.f;        // < 0 表示没有入场动画
-    float AnimDur = .18f, AnimBaseOpacity = 1.f, AnimDy = 0.f, AnimBaseMT = 0.f;
+    float AnimDur = .252f, AnimDelay = 0.f;
+    float AnimBaseOpacity = 1.f, AnimDy = 0.f, AnimBaseMT = 0.f;
 
     // ---- 树 ----
     Widget* Parent = nullptr;
@@ -145,5 +150,8 @@ protected:
 
 // 便捷构造
 VCUI_API std::shared_ptr<Widget> Sizer(float w, float h = 0.f);
+
+// Fluent 的 decelerate 曲线 cubic-bezier(0.1, 0.9, 0.2, 1)：起步快、收尾慢。
+VCUI_API float EaseDecelerate(float p);
 
 } // namespace vcui

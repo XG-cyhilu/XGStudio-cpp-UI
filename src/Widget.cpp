@@ -16,9 +16,31 @@
 
 #include "vcui/Widget.h"
 #include "vcui/Surface.h"
+#include "vcui/Controls.h"
 #include <cmath>
+#include <algorithm>
 
 namespace vcui {
+
+// cubic-bezier(0.1, 0.9, 0.2, 1)：起步快、收尾慢（Fluent decelerate）
+static float BezAxis(float t, float a1, float a2) {
+    float u = 1.f - t;
+    return 3.f * u * u * t * a1 + 3.f * u * t * t * a2 + t * t * t;
+}
+
+float EaseDecelerate(float p) {
+    if (p <= 0.f) return 0.f;
+    if (p >= 1.f) return 1.f;
+    const float x1 = 0.1f, y1 = 0.9f, x2 = 0.2f, y2 = 1.f;
+    // 先按 x 反解参数 t（贝塞尔曲线 x(t) 单调），再取 y(t)
+    float lo = 0.f, hi = 1.f, t = p;
+    for (int i = 0; i < 20; ++i) {
+        float x = BezAxis(t, x1, x2);
+        if (x < p) lo = t; else hi = t;
+        t = (lo + hi) * .5f;
+    }
+    return BezAxis(t, y1, y2);
+}
 
 Widget::~Widget() = default;
 
@@ -108,16 +130,36 @@ std::shared_ptr<Widget> Sizer(float w, float h) {
     return s;
 }
 
-void Widget::FadeIn(float dur, float dy) {
-    AnimDur = dur > 0.f ? dur : .18f;
+void Widget::FadeIn(float dur, float dy, float delay) {
+    AnimDur = dur > 0.f ? dur : .252f;
     AnimDy = dy;
-    AnimBaseOpacity = Opacity;
-    AnimBaseMT = MT;
+    AnimDelay = delay > 0.f ? delay : 0.f;
+    // 重启动画时必须沿用上一次的基准不透明度：此刻 Opacity 可能还停在 0，
+    // 若拿它当基准，动画终点就成了 0，内容会永远看不见。
+    AnimBaseOpacity = (AnimT >= 0.f) ? AnimBaseOpacity : Opacity;
+    AnimBaseMT = (AnimT >= 0.f) ? AnimBaseMT : MT;
     AnimT = 0.f;
-    Opacity = 0.f;              // 第一帧就画成透明，避免闪一下
+    Opacity = 0.f;                     // 延迟期内也是透明，避免闪一下
     MT = AnimBaseMT + AnimDy;
     AnimDirty = true;
     if (Host) Host->PlayAnim();  // 唤醒帧循环（平时是睡着的）
+}
+
+void Widget::StaggerIn(float dur, float dy, float step, float maxDelay) {
+    float d = 0.f;
+    auto next = [&]() { float v = std::min(d, maxDelay); d += step; return v; };
+
+    for (auto& k : kids_) {
+        // 滚动列表里真正"一行一行出现"的是 ScrollView 内容容器的直接子项
+        auto* sv = dynamic_cast<ScrollView*>(k.get());
+        if (sv && !sv->Children().empty()) {
+            auto* inner = sv->Children()[0].get();
+            for (auto& r : inner->Children()) r->FadeIn(dur, dy, next());
+        } else {
+            k->FadeIn(dur, dy, next());
+        }
+    }
+    if (Host) Host->PlayAnim();
 }
 
 bool Widget::Update(float dt) {
@@ -133,20 +175,26 @@ bool Widget::Update(float dt) {
     approach(aHover, Hover && Enabled ? 1.f : 0.f, .10f);
     approach(aPress, Press ? 1.f : 0.f, .06f);
 
-    // 入场：ease-out cubic（贴近 Fluent 的 decelerate）
+    // 入场：Fluent decelerate 贝塞尔，含各自的延迟
     if (AnimT >= 0.f) {
         AnimT += dt;
-        float p = AnimT / AnimDur;
-        if (p > 1.f) p = 1.f;
-        float e = 1.f - std::pow(1.f - p, 3.f);
-        Opacity = AnimBaseOpacity * e;
-        MT = AnimBaseMT + AnimDy * (1.f - e);
+        float local = AnimT - AnimDelay;
         AnimDirty = true;
         changed = true;
-        if (p >= 1.f) {
-            AnimT = -1.f;
-            Opacity = AnimBaseOpacity;
-            MT = AnimBaseMT;
+        if (local < 0.f) {
+            Opacity = 0.f;                        // 还没轮到自己
+            MT = AnimBaseMT + AnimDy;
+        } else {
+            float p = local / AnimDur;
+            if (p > 1.f) p = 1.f;
+            float e = EaseDecelerate(p);
+            Opacity = AnimBaseOpacity * e;
+            MT = AnimBaseMT + AnimDy * (1.f - e);
+            if (p >= 1.f) {
+                AnimT = -1.f;
+                Opacity = AnimBaseOpacity;
+                MT = AnimBaseMT;
+            }
         }
     }
 

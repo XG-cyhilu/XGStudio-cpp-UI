@@ -101,5 +101,29 @@ int main(int argc, char** argv) {
     root->Arrange(all);
     Dump(root.get(), 0, false, all);
     std::printf("\n越界节点：%d\n", g_bad);
-    return g_bad == 0 ? 0 : 2;
+
+    // 回归：连续两次入场动画不能把终点写成 0；错峰延迟必须递增；缓动端点与单调性正确
+    content->StaggerIn();
+    float prevDelay = -1.f, firstDelay = -1.f, lastDelay = 0.f;
+    int staggered = 0;
+    for (auto& k : content->Children()) {
+        if (k->AnimT < 0.f) continue;
+        if (firstDelay < 0.f) firstDelay = k->AnimDelay;
+        if (k->AnimDelay + 1e-4f < prevDelay) { std::printf("错峰延迟乱序：%.3f 在 %.3f 之后\n", k->AnimDelay, prevDelay); g_bad++; }
+        prevDelay = k->AnimDelay;
+        lastDelay = (std::max)(lastDelay, k->AnimDelay);
+        ++staggered;
+    }
+    for (int i = 0; i <= 120; ++i) root->Update(1.f / 60.f);   // 跑到所有项都结束
+    bool animOk = true;
+    for (auto& k : content->Children())
+        if (k->AnimT >= 0.f || k->Opacity < .99f) animOk = false;
+    float e0 = EaseDecelerate(0.f), e1 = EaseDecelerate(1.f), e5 = EaseDecelerate(.5f);
+    bool easeOk = std::abs(e0) < 1e-3f && std::abs(e1 - 1.f) < 1e-3f && e5 > .5f;
+    for (int i = 1; i <= 100; ++i)
+        if (EaseDecelerate(i / 100.f) < EaseDecelerate((i - 1) / 100.f) - 1e-4f) easeOk = false;
+    std::printf("入场回归：%d 项错峰，首次延迟=%.2fs 末次=%.2fs；缓动 e(0)=%.2f e(.5)=%.2f e(1)=%.2f %s\n",
+                staggered, firstDelay < 0 ? 0.f : firstDelay, lastDelay, e0, e5, e1,
+                (animOk && easeOk && staggered > 0) ? "OK" : "FAIL");
+    return (g_bad == 0 && animOk && easeOk && staggered > 0) ? 0 : 2;
 }

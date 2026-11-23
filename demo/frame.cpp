@@ -153,6 +153,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
         logScroll->Add(logBox);
         content->Add(logScroll);
+        content->StaggerIn();
     };
 
     // 页面 1：版本（子导航：已安装 / 可安装 / 整合包）
@@ -216,7 +217,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
         listScroll->Add(rows);
         content->Add(listScroll);
-        content->FadeIn(.18f, 10.f);
+        content->StaggerIn();
     };
 
     // 页面 2：下载（无子导航）
@@ -253,6 +254,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         }
         listScroll->Add(rows);
         content->Add(listScroll);
+        content->StaggerIn();
     };
 
     // 页面 3：设置（子导航：通用 / 外观 / Java / 下载 / 关于）
@@ -332,7 +334,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             content->Add(FormRow(L"许可证", L"AGPL-3.0"));
             break;
         }
-        content->FadeIn(.18f, 10.f);
+        content->StaggerIn();
     };
 
     int curPage = -1;
@@ -346,7 +348,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         case 2: BuildDownload(); break;
         default: ShowSettings(setTab); break;
         }
-        content->FadeIn(.18f, 10.f);   // 切页：淡入 + 上浮 10px
         app.Invalidate();
     };
     bar->NavChanged = [&](int i) { ShowPage(i); };
