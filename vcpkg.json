@@ -1,0 +1,9 @@
+{
+  "name": "vcui",
+  "version": "1.0.0",
+  "description": "Void Craft UI - 100% self-drawn Direct2D widget library for Windows",
+  "homepage": "https://github.com/XG-cyhilu/Void-Craft-UI",
+  "license": "Apache-2.0",
+  "supports": "windows",
+  "dependencies": []
+}
