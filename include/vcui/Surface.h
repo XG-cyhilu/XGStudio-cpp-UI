@@ -84,6 +84,15 @@ public:
     // 唤醒动画帧循环（输入事件后调用；没有动画时会自行停掉）
     void KickAnim();
 
+    // 客户区尺寸（DIP）。弹层定位用，比如对话框铺满、提示条贴右上角。
+    D2D1_SIZE_F ClientSize() const {
+        return D2D1::SizeF(float(width_) / scale_, float(height_) / scale_);
+    }
+
+    // 右上角提示条（Toast）。堆叠显示，到期自动淡出；返回的可忽略。
+    void ShowInfoBar(const std::wstring& text, InfoTone tone = InfoTone::Info, float seconds = 3.f);
+    void CloseInfoBars();
+
 private:
     static LRESULT CALLBACK WndProcThunk(HWND, UINT, WPARAM, LPARAM);
     LRESULT Handle(UINT msg, WPARAM wp, LPARAM lp);
@@ -95,6 +104,11 @@ private:
     Widget* HitAt(float x, float y, bool* inOverlay = nullptr);
     void CollectFocusable(Widget* w, std::vector<Widget*>& out);
     void CycleFocus(bool back);
+    // 悬停提示：WM_MOUSEMOVE 在 hot 变化时排定，600ms 后由 WM_TIMER 弹出
+    void ArmTooltip(Widget* w);
+    void ShowTooltipFor(Widget* w);
+    void HideTooltip();
+    void LayoutInfoBars();
 
     HWND hwnd_ = nullptr;
     Gfx g_;
@@ -113,6 +127,10 @@ private:
     bool mouseDown_ = false;
     float downX_ = 0.f, downY_ = 0.f;
     bool dragging_ = false;
+    std::shared_ptr<Widget> tip_;          // 当前提示气泡（覆盖层）
+    Widget* tipOwner_ = nullptr;           // 触发提示的控件
+    Widget* tipPending_ = nullptr;         // 已排定、尚未到时间的控件
+    std::vector<std::shared_ptr<InfoBar>> bars_;
     int width_ = 0, height_ = 0;
     bool animating_ = false;
     unsigned long long animLast_ = 0;

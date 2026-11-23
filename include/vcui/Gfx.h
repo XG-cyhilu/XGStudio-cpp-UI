@@ -61,9 +61,10 @@ struct VCUI_API Gfx {
     void DropResources();
 
     IDWriteTextFormat* Fmt(float px, int weight, const wchar_t* family = L"Microsoft YaHei",
-                           HAlign ha = HAlign::Left, VAlign va = VAlign::Top);
+                           HAlign ha = HAlign::Left, VAlign va = VAlign::Top, bool wrap = false);
     IDWriteTextLayout* Layout(const std::wstring& s, float px, int weight, const wchar_t* family,
-                              HAlign ha, VAlign va, float maxWidth, float maxHeight = 4096.f);
+                              HAlign ha, VAlign va, float maxWidth, float maxHeight = 4096.f,
+                              bool wrap = false);
     ID2D1SolidColorBrush* Solid(D2D1_COLOR_F c);
 
     void Clear(D2D1_COLOR_F c);
@@ -79,7 +80,7 @@ struct VCUI_API Gfx {
     void PopClip();
 
     void Text(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
-              HAlign ha = HAlign::Left, VAlign va = VAlign::Top);
+              HAlign ha = HAlign::Left, VAlign va = VAlign::Top, bool wrap = false);
     // 单行文本 + 省略号：超出宽度时截断并在尾部补「…」
     void TextTrim(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
                   HAlign ha = HAlign::Left, VAlign va = VAlign::Top);

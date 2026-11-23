@@ -39,6 +39,7 @@ set(VCUI_SOURCES
     src/Layout.cpp
     src/Controls.cpp
     src/Controls.More.cpp
+    src/Feedback.cpp
     src/Surface.cpp)
 
 if (VCUI_BUILD_SHARED)

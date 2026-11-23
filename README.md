@@ -293,7 +293,7 @@ t2->UseType(Type::Body1);                      // 14 / 20 Regular
 | 控件 | 关键字段 / 回调 |
 |---|---|
 | `Label` | `Text`、`Size`、`Weight`、`LineHeight`(0=按 type ramp)、`UseType(Type::Body1)`、`Color`、`Align`、`VAlignMode`、`Wrap`、`Ellipsis`（超宽尾截断加「…」） |
-| `Button` | `Text`、`Glyph`(Segoe MDL2)、`Primary`、`MinWidth`、`Clicked` |
+| `Button` | `Text`、`Glyph`(Segoe MDL2)、`Primary`、`Danger`(红字描边，悬停变红底白字)、`MinWidth`、`Clicked` |
 | `Checkbox` | `On`、`Text`、`Changed(bool)` |
 | `Switch` | `On`、`Changed(bool)` |
 | `Input` | `Text`、`Placeholder`、`Caret`、`SelAnchor`、`Changed(str)`、`Submitted` |
@@ -305,7 +305,33 @@ t2->UseType(Type::Body1);                      // 14 / 20 Regular
 | `ListRow` | `Title`、`Sub`、`Right`、`Selected`、`Clicked` |
 | `IconButton` | `Glyph`、`GlyphSize`、`Ghost`、`Clicked` |
 | `Dropdown` | `Items`、`Selected`、`MenuWidth`、`Changed(int)` |
+| `Tooltip` | 一般不用手动建：给任意控件设 `Widget::Tooltip = L"…"`，悬停 600ms 由 Surface 弹出 |
+| `InfoBar` | 由 `Surface::ShowInfoBar(text, InfoTone::Info/Success/Warning/Danger, 秒)` 创建；右上角堆叠、可点 ✕ 关闭、到期自动淡出，悬停暂停计时 |
+| `Dialog` | `Dialog::Open(host, 标题, 正文, { DialogAction{文本, Primary, Danger, 回调} }, 点遮罩是否关闭, 卡片宽)`；全屏遮罩 + 居中卡片，Esc / 点遮罩关闭，按钮回调先执行再关闭 |
 | `TitleBar` | `Title`、`BtnWidth`、`ShowMinimize/Maximize/Close`、`Fill`、`OnCloseRequested`；非按钮区整条作为拖动区，双击可最大化。顶栏导航：`NavItems`、`NavIndex`、`NavCentered`、`NavGap`、`NavChanged(int)`——选中项用胶囊底高亮 |
+
+### 反馈层（提示 / 提示条 / 对话框）
+
+三者都是覆盖层，不参与页面布局，深色浅色都跟着 Token 走：
+
+```cpp
+// 悬停提示：给控件一句话，Surface 负责延时、定位（下面放不下会自动翻到上面）
+btn->Tooltip = L"删除前会再确认一次";
+
+// 提示条：右上角堆叠，3 秒后淡出
+app.ShowInfoBar(L"已保存到本地", InfoTone::Success, 3.f);
+
+// 对话框：模态遮罩，标题 + 自动换行的正文 + 按钮行
+Dialog::Open(&app, L"删除这个实例？", L"实例目录、版本 JSON 与存档都会被移除。",
+             { DialogAction{ L"取消" }, DialogAction{ L"删除", false, true, []{ /* 真删 */ } } });
+```
+
+实现要点：
+
+- 提示条计时靠 `WM_TIMER`，静止时没有帧循环也不会卡住；淡入淡出走 `Opacity`，右侧 24dip 滑入
+- 对话框覆盖层设 `FillHost = true`，每次绘制按当前客户区重排，窗口缩放时遮罩和卡片自动居中
+- 遮罩本身 `Interactive = true`，点击不会穿透到下面的页面；点卡片内部不算“外面”，所以遮罩不会误关
+- `Esc` 走 Surface 的 dismiss 通道，关闭时不会残留 `dismiss_`
 
 ### 自绘边框窗口（TitleBar）
 

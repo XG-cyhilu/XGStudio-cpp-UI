@@ -148,8 +148,10 @@ ID2D1SolidColorBrush* Gfx::Solid(D2D1_COLOR_F c) {
     return ins.first->second.Get();
 }
 
-IDWriteTextFormat* Gfx::Fmt(float px, int weight, const wchar_t* family, HAlign ha, VAlign va) {
-    int key = FmtKeyOf(px, weight, family, ha, va);
+IDWriteTextFormat* Gfx::Fmt(float px, int weight, const wchar_t* family, HAlign ha, VAlign va,
+                            bool wrap) {
+    int base = FmtKeyOf(px, weight, family, ha, va);
+    int key = base * 2 + (wrap ? 1 : 0);   // 换行/不换行各缓存一份
     auto it = fmts.find(key);
     if (it != fmts.end()) return it->second.Get();
 
@@ -158,7 +160,7 @@ IDWriteTextFormat* Gfx::Fmt(float px, int weight, const wchar_t* family, HAlign 
                                         DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
                                         px, L"zh-CN", &f)))
         return nullptr;
-    f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    f->SetWordWrapping(wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP);
     f->SetTextAlignment(ha == HAlign::Left ? DWRITE_TEXT_ALIGNMENT_LEADING
                          : ha == HAlign::Center ? DWRITE_TEXT_ALIGNMENT_CENTER
                          : DWRITE_TEXT_ALIGNMENT_TRAILING);
@@ -170,15 +172,16 @@ IDWriteTextFormat* Gfx::Fmt(float px, int weight, const wchar_t* family, HAlign 
 }
 
 IDWriteTextLayout* Gfx::Layout(const std::wstring& s, float px, int weight, const wchar_t* family,
-                               HAlign ha, VAlign va, float maxWidth, float maxHeight) {
+                               HAlign ha, VAlign va, float maxWidth, float maxHeight, bool wrap) {
     if (!dwrite || s.empty()) return nullptr;
-    IDWriteTextFormat* f = Fmt(px, weight, family, ha, va);
+    IDWriteTextFormat* f = Fmt(px, weight, family, ha, va, wrap);
     if (!f) return nullptr;
     if (maxWidth < 1.f) maxWidth = 1.f;
     if (maxHeight < 1.f) maxHeight = 1.f;
     uint64_t h = 1469598103934665603ULL;
     for (wchar_t c : s) h = Mix64(h, (uint64_t)c);
     h = Mix64(h, (uint64_t)FmtKeyOf(px, weight, family, ha, va));
+    h = Mix64(h, (uint64_t)(wrap ? 1 : 0));
     h = Mix64(h, (uint64_t)(int)maxWidth);
     h = Mix64(h, (uint64_t)(int)maxHeight);
 
@@ -300,7 +303,7 @@ void Gfx::PopClip() {
 }
 
 void Gfx::Text(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
-               HAlign ha, VAlign va) {
+               HAlign ha, VAlign va, bool wrap) {
     static int off = -1;
     if (off < 0) off = GetEnvironmentVariableW(L"VCUI_NOTEXT", nullptr, 0) > 0 ? 1 : 0;
     if (off) return;
@@ -308,7 +311,7 @@ void Gfx::Text(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1
     float w = rc.right - rc.left;
     float h = rc.bottom - rc.top;
     if (w <= 0.f || h <= 0.f) return;
-    IDWriteTextLayout* lay = Layout(s, px, weight, L"Microsoft YaHei", ha, va, w, h);
+    IDWriteTextLayout* lay = Layout(s, px, weight, L"Microsoft YaHei", ha, va, w, h, wrap);
     if (!lay) return;
     if (auto br = Solid(c)) rt->DrawTextLayout(D2D1::Point2F(rc.left, rc.top), lay, br);
 }

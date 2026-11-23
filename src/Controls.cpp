@@ -29,6 +29,15 @@ D2D1_SIZE_F Label::Desired(float availW, float availH) {
     (void)availH;
     float w = W > 0 ? W : Tw(Text, Size, Weight);
     float h = H > 0 ? H : (LineHeight > 0.f ? LineHeight : LineH(Size));
+    // Wrap 且宽度已定：按实际排版的行数算高，多行文本才不会被压成一行
+    if (W > 0 && Wrap && GFX) {
+        if (auto lay = GFX->Layout(Text, Size, Weight, L"Microsoft YaHei", Align, VAlignMode, W,
+                                   4096.f, true)) {
+            DWRITE_TEXT_METRICS tm{};
+            lay->GetMetrics(&tm);
+            if (tm.height > 1.f) h = tm.height;
+        }
+    }
     return D2D1::SizeF(w, h);
 }
 
@@ -38,7 +47,7 @@ void Label::Paint(PaintCtx& ctx) {
     if (Ellipsis) {
         ctx.g.TextTrim(fr_, Text, Size, Weight, col, Align, VAlignMode);
     } else {
-        ctx.g.Text(fr_, Text, Size, Weight, col, Align, VAlignMode);
+        ctx.g.Text(fr_, Text, Size, Weight, col, Align, VAlignMode, Wrap);
     }
 }
 
@@ -66,7 +75,13 @@ void Button::Paint(PaintCtx& ctx) {
     float hov = HoverA(), prs = PressA();
 
     D2D1_COLOR_F fill, fg, brd{ 0, 0, 0, 0 };
-    if (Primary) {
+    if (Danger) {
+        // 危险操作：平时红字描边，悬停/按下变红底白字（Win11 危险按钮的观感）
+        fill = Mix(Ctrl(t), Hex(0xC42B1C), hov);
+        fill = Mix(fill, Hex(0xB0281A), prs);
+        fg = Mix(Hex(0xC42B1C), Hex(0xFFFFFF), hov);
+        brd = A(Hex(0xC42B1C), .55f + .45f * std::max(hov, prs));
+    } else if (Primary) {
         fill = Mix(t.accent, t.accentHover, hov);
         fill = Mix(fill, t.accentPress, prs);
         fg = t.onAccent;

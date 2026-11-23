@@ -262,7 +262,86 @@ void Surface::ClearOverlays() {
     overlays_.clear();
     hot_ = nullptr;
     active_ = nullptr;
+    tip_.reset();
+    tipOwner_ = nullptr;
+    tipPending_ = nullptr;
+    bars_.clear();
+    if (hwnd_) { KillTimer(hwnd_, 1); KillTimer(hwnd_, 2); }
     Invalidate();
+}
+
+void Surface::ArmTooltip(Widget* w) {
+    if (hwnd_) KillTimer(hwnd_, 1);
+    if (tipPending_ && tipPending_ != w) { /* 换了控件，旧提示不弹 */ }
+    tipPending_ = (w && !w->Tooltip.empty() && tipOwner_ != w) ? w : nullptr;
+    if (tipPending_ && hwnd_) SetTimer(hwnd_, 1, 600, nullptr);
+}
+
+void Surface::ShowTooltipFor(Widget* w) {
+    if (!w || w->Tooltip.empty() || !w->Visible) return;
+    auto tip = std::make_shared<Tooltip>();
+    tip->Text = w->Tooltip;
+    tip->GFX = &g_;                 // 先给测量入口，才能算出气泡宽度
+    float tw = g_.TextW(tip->Text, 12.f, 400) + 26.f;
+    float th = 28.f;
+    if (tw < 40.f) tw = 40.f;
+    D2D1_RECT_F f = w->Frame();
+    D2D1_SIZE_F cs = ClientSize();
+
+    float x = (f.left + f.right) * .5f - tw * .5f;
+    float y = f.bottom + 6.f;
+    if (y + th > cs.height - 6.f) y = f.top - 6.f - th;   // 下面放不下就翻到上面
+    if (y < 4.f) y = 4.f;
+    x = std::clamp(x, 6.f, std::max(6.f, cs.width - tw - 6.f));
+
+    HideTooltip();
+    tip->X = x; tip->Y = y; tip->W = tw; tip->H = th;
+    tip_ = tip;
+    tipOwner_ = w;
+    AddOverlay(tip);
+    Invalidate();
+}
+
+void Surface::HideTooltip() {
+    if (hwnd_) KillTimer(hwnd_, 1);
+    tipPending_ = nullptr;
+    if (tip_) {
+        RemoveOverlay(tip_.get());
+        tip_.reset();
+    }
+    tipOwner_ = nullptr;
+}
+
+void Surface::LayoutInfoBars() {
+    float csW = ClientSize().width;
+    float y = 56.f;      // 标题栏下方
+    for (auto& b : bars_) {
+        if (b->Dead) continue;
+        if (b->W <= 0.f || b->H <= 0.f) continue;
+        b->baseX = csW - b->W - 16.f;
+        b->X = b->baseX + 24.f * (1.f - b->aIn);
+        b->Y = y;
+        y += b->H + 8.f;
+    }
+}
+
+void Surface::ShowInfoBar(const std::wstring& text, InfoTone tone, float seconds) {
+    if (text.empty()) return;
+    auto bar = std::make_shared<InfoBar>(text, tone, std::max(600.f, seconds * 1000.f));
+    AddOverlay(bar);                       // 先挂上，才有 GFX 可以量字宽
+    D2D1_SIZE_F d = bar->Desired(420.f, 60.f);
+    bar->W = d.width;
+    bar->H = d.height;
+    bars_.push_back(bar);
+    LayoutInfoBars();
+    if (hwnd_) SetTimer(hwnd_, 2, 150, nullptr);
+    PlayAnim();
+    Invalidate();
+}
+
+void Surface::CloseInfoBars() {
+    for (auto& b : bars_) b->StartExit();
+    PlayAnim();
 }
 
 void Surface::SetFocus(Widget* w) {
@@ -360,7 +439,8 @@ void Surface::Paint() {
         root_->PaintTree(ctx);
     }
     for (auto& o : overlays_) {
-        o->Arrange(D2D1_RECT_F{ o->X, o->Y, o->X + o->W, o->Y + o->H });
+        if (o->FillHost) o->Arrange(D2D1_RECT_F{ 0, 0, w, h });   // 对话框遮罩铺满、随缩放自适应
+        else o->Arrange(D2D1_RECT_F{ o->X, o->Y, o->X + o->W, o->Y + o->H });
         o->PaintTree(ctx);
     }
 
@@ -423,14 +503,6 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_ERASEBKGND:
         return 1;
-
-    case WM_TIMER: {
-        unsigned long long now = GetTickCount64();
-        float dt = float(now - animLast_) / 1000.f;
-        animLast_ = now;
-        Tick(dt);
-        return 0;
-    }
 
     case WM_PAINT: {
         PAINTSTRUCT ps;
@@ -529,6 +601,7 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
             if (hot_) { hot_->Hover = false; hot_->OnHover(false); }
             hot_ = w;
             if (hot_) { hot_->Hover = true; hot_->OnHover(true); }
+            ArmTooltip(hot_);
         }
         UpdateCursor(x, y);
         KickAnim();
@@ -539,6 +612,7 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
     case WM_LBUTTONDOWN: {
         float x = (float)GET_X_LPARAM(lp) / scale_;
         float y = (float)GET_Y_LPARAM(lp) / scale_;
+        HideTooltip();
         bool inOverlay = false;
         Widget* w = HitAt(x, y, &inOverlay);
 
@@ -587,6 +661,33 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         UpdateCursor(x, y);
         KickAnim();
         Invalidate();
+        return 0;
+    }
+
+    case WM_TIMER: {
+        if (wp == 1) {                      // 悬停提示到期
+            KillTimer(hwnd_, 1);
+            Widget* w = tipPending_;
+            tipPending_ = nullptr;
+            if (w && w == hot_ && !mouseDown_) ShowTooltipFor(w);
+            return 0;
+        }
+        if (wp == 2) {                      // 提示条计时：静止时没有帧循环，靠这里推时钟
+            for (size_t i = 0; i < bars_.size();) {
+                auto& b = bars_[i];
+                if (b->Dead) { bars_.erase(bars_.begin() + i); continue; }
+                b->TickClock();
+                if (!b->Exiting && b->holdMs_ >= b->LifeMs) b->StartExit();
+                ++i;
+            }
+            if (bars_.empty()) KillTimer(hwnd_, 2);
+            PlayAnim();
+            // 继续走通用帧推进，让淡出动画平滑
+        }
+        unsigned long long now = GetTickCount64();
+        float dt = float(now - animLast_) / 1000.f;
+        animLast_ = now;
+        Tick(dt);
         return 0;
     }
 
@@ -653,6 +754,8 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
     }
 
     case WM_DESTROY:
+        KillTimer(hwnd_, 1);
+        KillTimer(hwnd_, 2);
         g_.DropResources();
         PostQuitMessage(0);
         return 0;

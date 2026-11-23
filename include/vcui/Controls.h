@@ -52,6 +52,7 @@ public:
     std::wstring Text;
     std::wstring Glyph;       // Segoe MDL2 字符，可空
     bool Primary = false;
+    bool Danger = false;      // 危险操作：悬停变红底白字
     float MinWidth = 0.f;
 
     Button() { H = 34.f; Interactive = true; }
@@ -274,6 +275,84 @@ public:
 private:
     std::shared_ptr<Widget> menu_;
     float aLinear = 0.f;   // 线性进度 0..1，驱动 aOpen 的 smoothstep
+};
+
+// ---------------- 反馈类 ----------------
+
+enum class InfoTone { Info, Success, Warning, Danger };
+
+// 悬停提示气泡。一般不要直接 new，给控件设 Widget::Tooltip 即可。
+class VCUI_API Tooltip : public Widget {
+public:
+    std::wstring Text;
+    Tooltip() { H = 28.f; }
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void Paint(PaintCtx& ctx) override;
+};
+
+// 提示条（Toast / InfoBar）：右上角堆叠、定时自动消失。
+// 由 Surface::ShowInfoBar 创建并托管，不要手动挂到控件树。
+class VCUI_API InfoBar : public Widget {
+public:
+    std::wstring Text;
+    InfoTone ToneKind = InfoTone::Info;
+    float LifeMs = 3000.f;      // 停留时长（悬停时暂停计时）
+    bool Exiting = false;
+
+    InfoBar() { Interactive = true; H = 52.f; }
+    explicit InfoBar(std::wstring text, InfoTone tone = InfoTone::Info, float lifeMs = 3000.f);
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void Paint(PaintCtx& ctx) override;
+    bool Update(float dt) override;
+    void OnClickAt(float x, float y) override;
+    CursorShape CursorAt(float x, float y) const override;
+    void StartExit();                        // 开始淡出，动画结束自我销毁
+
+    std::function<void()> Closed;
+
+private:
+    float aIn = 0.f, aOut = 0.f;
+    float baseX = 0.f;        // 目标 X，滑入动画在它上面偏移
+    unsigned long long lastMs_ = 0;
+    float holdMs_ = 0.f;      // 已停留时长（悬停不计）
+    void TickClock();         // 由 Surface 的定时器推进计时（静止时也要走）
+    friend class Surface;
+};
+
+struct DialogAction {
+    std::wstring Text;
+    bool Primary = false;
+    bool Danger = false;
+    std::function<void()> OnClick;    // 点击后先执行它，再关闭对话框
+};
+
+// 模态对话框：全屏压暗遮罩 + 居中卡片。用 Dialog::Open 打开，
+// 点遮罩 / Esc 关闭（DismissOnScrim），按钮回调里可自行决定是否保留。
+class VCUI_API Dialog : public Widget {
+public:
+    std::wstring Title, Message;
+    std::vector<DialogAction> Actions;
+    bool DismissOnScrim = true;
+    float CardWidth = 420.f;
+    std::function<void()> Closed;
+
+    Dialog();
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void LayoutChildren() override;
+    void Paint(PaintCtx& ctx) override;
+    void OnClickAt(float x, float y) override;
+    bool Focusable() const override { return true; }
+    void Close();
+
+    // 打开即挂到 Surface 覆盖层最上方。actions 为空时给一个「确定」。
+    static std::shared_ptr<Dialog> Open(Surface* host, std::wstring title, std::wstring message,
+                                        std::vector<DialogAction> actions = {},
+                                        bool dismissOnScrim = true, float cardWidth = 420.f);
+
+private:
+    std::shared_ptr<Widget> card_;
+    float cardH_ = 0.f;
 };
 
 // 自绘标题栏：标题文字 + 可选顶栏导航 + 最小化 / 最大化 / 关闭（配合 Surface::SetCustomFrame）。

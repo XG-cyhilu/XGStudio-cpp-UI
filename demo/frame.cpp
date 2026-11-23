@@ -133,8 +133,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         auto stats = HBox(12.f);
         stats->H = 44.f;
         stats->Cross = Stack::Center;
-        stats->Add(std::make_shared<Badge>(L"19 个控件", Badge::Neutral));
-        stats->Add(std::make_shared<Badge>(L"8 种容器", Badge::Neutral));
+        stats->Add(std::make_shared<Badge>(L"17 个控件", Badge::Neutral));
+        stats->Add(std::make_shared<Badge>(L"7 种容器", Badge::Neutral));
         stats->Add(std::make_shared<Badge>(L"14 档字级", Badge::Accent));
         stats->Add(std::make_shared<Badge>(L"浅/深 × 2 色板", Badge::Success));
         content->Add(stats);
@@ -309,6 +309,45 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             ell->W = 420.f;
             b5->Add(ell);
             col->Add(b5);
+
+            // 反馈类：悬停提示 / 提示条 / 对话框
+            auto b6 = VBox(10.f);
+            b6->Add(DemoHead(L"Tooltip / InfoBar / Dialog",
+                             L"提示气泡走 Widget::Tooltip；提示条右上角堆叠并自动消失；对话框带遮罩与按钮回调"));
+            auto frow = HBox(10.f);
+            frow->Cross = Stack::Center;
+
+            auto tbtn = std::make_shared<Button>(L"悬停看 Tooltip");
+            tbtn->Tooltip = L"600ms 后出现在控件下方，下面是 Tooltip 控件画的";
+            frow->Add(tbtn);
+
+            auto ibtn = std::make_shared<Button>(L"弹一条提示");
+            ibtn->Clicked = [&app]() {
+                static int n = 0;
+                ++n;
+                app.ShowInfoBar(L"第 " + std::to_wstring(n) + L" 条提示：已保存到本地", InfoTone::Success, 3.f);
+            };
+            frow->Add(ibtn);
+
+            auto wbtn = std::make_shared<Button>(L"警告提示");
+            wbtn->Clicked = [&app]() {
+                app.ShowInfoBar(L"网络不可达，已切换到离线模式", InfoTone::Warning, 4.f);
+            };
+            frow->Add(wbtn);
+
+            auto dbtn = std::make_shared<Button>(L"打开对话框", true);
+            dbtn->Clicked = [&app]() {
+                Dialog::Open(&app, L"删除这个实例？",
+                             L"实例目录、版本 JSON 与存档都会被移除，且无法从启动器还原。",
+                             { DialogAction{ L"取消", false, false, nullptr },
+                               DialogAction{ L"删除", false, true, []() {} } });
+            };
+            frow->Add(dbtn);
+            b6->Add(frow);
+
+            auto hint = L(L"对话框：点遮罩或按 Esc 关闭，按钮回调先执行再关闭。", Type::Caption1);
+            b6->Add(hint);
+            col->Add(b6);
         }
 
         scroll->Add(col);

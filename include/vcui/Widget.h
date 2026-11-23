@@ -63,6 +63,10 @@ public:
     bool Caption = false;      // 标记为窗口拖动区（标题栏用）
     float Opacity = 1.f;       // 子树整体不透明度（弹层淡入用）
     std::wstring Id;
+    // 悬停提示：非空时鼠标停在该控件上 600ms 后由 Surface 弹出提示。
+    std::wstring Tooltip;
+    // 覆盖层专用：为真时每次绘制都铺满客户区（对话框遮罩会随窗口尺寸自适应）。
+    bool FillHost = false;
 
     // ---- 运行状态（Surface 维护，不要手动改）----
     bool Hover = false;
