@@ -108,12 +108,13 @@ XGStudio-cpp-UI/
 │  ├─ Gfx.h               绘制上下文（自定义控件用）
 │  ├─ Widget.h            控件基类 / PaintCtx / 动画与命中
 │  ├─ Layout.h            Stack(VBox/HBox) / Card / Absolute / Divider / ScrollView
-│  ├─ Controls.h          13 个控件
+│  ├─ Controls.h          17 个控件
 │  └─ Surface.h           宿主窗口
 ├─ src/                   实现（不对外）
 ├─ demo/
 │  ├─ main.cpp            全控件展示
 │  ├─ minimal.cpp         最小用法示例
+│  ├─ multiwin.cpp        多窗口 + 共享消息循环
 │  └─ frame.cpp           控件库展示程序（总览/控件/布局/主题，四页 + 子导航）
 ├─ tools/
 │  └─ layoutcheck.cpp     无窗口布局自检：打印节点 frame 并统计越界（VCUILayoutCheck）
@@ -132,13 +133,16 @@ cmake --build .build --config Release
 - `Release\vcui.lib`
 - `Release\VCUIDemo.exe`（全控件展示）
 - `Release\VCUIMinimal.exe`（最小示例）
+- `Release\VCUIMultiWin.exe`（多窗口）
+- `Release\VCUIFrameDemo.exe`（控件库展示程序）
+- `Release\VCUILayoutCheck.exe`（布局/动画自检）
 
 CMake 选项：
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
 | `VCUI_BUILD_SHARED` | OFF | ON 时构建 `vcui.dll` + 导入库 |
-| `VCUI_BUILD_DEMO` | ON | 构建两个示例 |
+| `VCUI_BUILD_DEMO` | ON | 构建示例程序 |
 | `VCUI_STATIC_RUNTIME` | OFF | `/MT`，MSVC 运行时静态链接，便于单文件分发 |
 
 依赖的系统库已由 `VCUI::vcui` 自动传递：`d2d1 dwrite dwmapi uxtheme user32 gdi32 ole32 imm32`。
@@ -253,6 +257,8 @@ return vcui::CreateAppWindow(o);
 | `ClientSize()` | 客户区尺寸（DIP），覆盖层定位用 |
 | `ShowInfoBar` / `CloseInfoBars` / `SetInfoBarWidth` | 右上角提示条 |
 | `CreateAppWindow(AppOptions)` | 一键建窗 + 标题栏 + 内容区 + 消息循环（见「快速开始」） |
+| `CreateAppSurface` / `RunAppLoop` / `QuitApp` | 只建窗 / 共享消息循环 / 退出全部窗口（见「多窗口」） |
+| `Focused()` / `SetFocus(w)` | 键盘焦点；`SetFocus` 会自动把控件滚进最近的 `ScrollView` |
 
 ### Widget
 
@@ -261,6 +267,7 @@ return vcui::CreateAppWindow(o);
 - 尺寸：`W/H`（`<0` 表示按内容/由容器决定）、`Grow`、`Basis`
 - 间距：`ML/MT/MR/MB`（外边距）、`PL/PT/PR/PB`（内边距），`Pad(v)` / `Margin(v)`
 - 行为：`Visible`、`Enabled`、`Interactive`（命中目标）、`Clip`、`Opacity`、`Caption`（窗口拖动区）
+- 焦点：`Focusable()`（默认 false，重写成 true 才进 Tab 队列）、`Focus`（当前是否聚焦）、`FocusRing`（是否画库统一焦点环，默认 true）
 - 动画读数：`HoverA()`、`PressA()`、`AnimDirty`
 - 事件：`Clicked`，以及可重写的 `OnClick/OnClickAt/OnDrag/OnChar/OnKeyDown/OnFocus/OnWheel/OnImeMessage`
 
@@ -426,6 +433,45 @@ bar->NavChanged = [](int i) { /* 切页 */ };
 
 键盘侧：选区（Shift+方向 / Home / End / 拖拽）、`Ctrl+A/C/X/V/Z`、撤销栈、Backspace/Delete 都已实现。
 
+## 键盘与焦点
+
+开箱可用，不用在每个控件里自己写焦点逻辑：
+
+| 键 | 行为 |
+|---|---|
+| `Tab` / `Shift+Tab` | 在可聚焦控件间移动焦点（只走 `Focusable()` 为真的），顺序就是树序；焦点落到视口外时最近的 `ScrollView` 会自动滚过去 |
+| `Space` / `Enter` | 激活 `Button` / `IconButton` / `NavItem`；`Checkbox` / `Switch` 用 `Space` 切换 |
+| `←` `→` `↑` `↓` | `Slider` 步进 1%（按住 `Shift` 10%）、`Segmented` 换段、`Dropdown` 展开后换选中项、侧栏 `NavItem` 在单选组里上下移动 |
+| `Home` / `End` | 值到两端 / 段跳到首尾 / 滚动到顶底 |
+| `PgUp` / `PgDn` | 滑块 10% 步进、滚动容器翻页 |
+| `F4` / `Alt+↓` | 展开或收起下拉框（Windows 惯例键） |
+| `Esc` | 先收起最上层弹层/对话框；没有弹层时转发给焦点控件 |
+
+- 焦点环由库统一画：控件框外扩 2px 的 2px `accent` 描边，整棵树画完之后叠加，并夹到最近的 `Clip` 容器里（不会画到滚动容器外面）
+- 自带焦点视觉的控件关掉了它（`FocusRing = false`）：`Input`（聚焦是 accent 描边 + 光标）、`Dropdown`（展开/聚焦是 accent 描边）、`ScrollView`、`Dialog`
+- 窗口失焦（`WM_ACTIVATE`）时不画环，切回来再画
+- 控件被销毁时会自动从宿主的 悬停 / 按下 / 焦点 / 提示 槽里摘掉，所以「切页时重建子导航」「重建整页」都不会留下悬空指针
+- 有模态（`FillHost` 覆盖层，比如对话框）时 `Tab` 只在这一层里转，跑不到被遮罩盖住的页面；对话框打开时焦点落在主按钮，回车即确认
+- 自定义控件想进 Tab 顺序：`bool Focusable() const override { return true; }`，再实现 `OnKeyDown(vk)` 处理 `VK_SPACE` / `VK_RETURN`
+
+## 多窗口
+
+同进程开多个窗口、共用一条消息循环，关掉一个不会带走整个进程：
+
+```cpp
+auto w1 = CreateAppSurface({ .Title = L"主窗口", .Width = 900, .Height = 600, .Build = BuildA });
+auto w2 = CreateAppSurface({ .Title = L"面板",   .Width = 420, .Height = 260, .Build = BuildB });
+return RunAppLoop();      // 最后一个窗口关掉才返回
+```
+
+- `CreateAppSurface` 只建窗、不阻塞；返回的 `Surface` 要一直持有到 `RunAppLoop` 返回（窗口靠它活着）
+- 一条循环里所有窗口一起推帧：`Animating()` 的窗口各自 `Tick`、各自 `UpdateWindow`，每帧只 `DwmFlush()` 一次对齐合成节拍
+- `WM_DESTROY` 里按窗口计数，最后一个才 `PostQuitMessage`；`QuitApp()` 一次性关掉全部窗口
+- `AppOptions::Build` 在树挂载之后执行，回调里 `body.Host` / `body.GFX` 已经就绪（可以查主题、挂弹层、再开新窗口）
+- 单窗口用 `CreateAppWindow` / `Surface::Run` 时走的也是这条共享循环（`Run()` 内部就是 `RunAppLoop()`）
+
+示例程序：`VCUIMultiWin`（启动即两个窗口，主窗口里能再开新的、也能一键退出全部）。
+
 ## 自定义控件
 
 ```cpp
@@ -493,7 +539,6 @@ row->FadeIn(.252f, 8.f, .12f);   // 单项 + 指定延迟
 
 - 滚动无惯性余速（滚动条本身已自绘，支持悬停显形与拖拽）
 - 下拉只向下展开，不自动翻转
-- 滑块无键盘步进
 - 阴影是 4 层圆角位图叠加，不是真高斯
 - Segmented 悬停段（`Hot`）尚未按鼠标位置计算
 

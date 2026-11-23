@@ -67,6 +67,9 @@ public:
     std::wstring Tooltip;
     // 覆盖层专用：为真时每次绘制都铺满客户区（对话框遮罩会随窗口尺寸自适应）。
     bool FillHost = false;
+    // 键盘焦点时是否画库统一的焦点环。自带焦点视觉的控件（Input 的 accent 描边、
+    // Dropdown、对话框）应置 false，否则会跟自身描边叠成双层。
+    bool FocusRing = true;
 
     // ---- 运行状态（Surface 维护，不要手动改）----
     bool Hover = false;
@@ -131,6 +134,8 @@ public:
     virtual void OnClickAt(float /*x*/, float /*y*/) { OnClick(); }
     virtual void OnDrag(float /*x*/, float /*y*/) {}
     virtual void OnChar(wchar_t) {}
+    // 键盘：焦点控件收到（Tab / Esc 由 Surface 先处理）。
+    // 空格与回车统一用 VK_SPACE / VK_RETURN 判断，控件自己决定语义（激活 / 切换 / 步进）。
     virtual void OnKeyDown(int) {}
     virtual void OnFocus(bool) {}
     virtual void OnWheel(float /*dy*/, float /*x*/, float /*y*/) {}

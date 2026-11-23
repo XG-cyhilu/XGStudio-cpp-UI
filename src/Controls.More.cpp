@@ -76,6 +76,31 @@ void NavItem::OnClick() {
     if (Clicked) Clicked();
 }
 
+void NavItem::OnKeyDown(int vk) {
+    if (vk == VK_SPACE || vk == VK_RETURN) { OnClick(); return; }
+    if (vk != VK_UP && vk != VK_DOWN && vk != VK_LEFT && vk != VK_RIGHT) return;
+    if (!Parent || !Host) return;
+
+    // 同父容器内的 NavItem 是一个单选组：方向键顺着走，焦点与选中一起移
+    std::vector<NavItem*> sib;
+    for (auto& s : Parent->Children()) {
+        if (auto* n = dynamic_cast<NavItem*>(s.get()))
+            if (n->Visible && n->Enabled) sib.push_back(n);
+    }
+    if (sib.size() < 2) return;
+    int idx = -1;
+    for (size_t i = 0; i < sib.size(); ++i) if (sib[i] == this) { idx = int(i); break; }
+    if (idx < 0) return;
+    int dir = (vk == VK_DOWN || vk == VK_RIGHT) ? 1 : -1;
+    int n = int(sib.size());
+    NavItem* next = sib[(idx + dir + n) % n];
+
+    Host->SetFocus(next);
+    // 切换页面时回调可能把整组 NavItem 重建（旧对象就此销毁），所以这里必须是
+    // 本函数最后一个动到 this / next 的操作，之后直接 return。
+    next->OnClick();
+}
+
 // ---------------- ListRow ----------------
 
 ListRow::ListRow(std::wstring title, std::wstring sub, std::wstring right)
@@ -154,6 +179,11 @@ void IconButton::Paint(PaintCtx& ctx) {
     ctx.g.Glyph(fr_, Glyph, GlyphSize, Enabled ? t.wz : t.text3, HAlign::Center, VAlign::Middle);
 }
 
+void IconButton::OnKeyDown(int vk) {
+    if (!Enabled) return;
+    if (vk == VK_SPACE || vk == VK_RETURN) OnClick();
+}
+
 // ---------------- Dropdown ----------------
 
 Dropdown::Dropdown(std::vector<std::wstring> items, int selected)
@@ -161,6 +191,7 @@ Dropdown::Dropdown(std::vector<std::wstring> items, int selected)
     H = 34.f;
     W = 180.f;
     Interactive = true;
+    FocusRing = false;   // 展开/聚焦时自身已是 accent 描边
 }
 
 D2D1_SIZE_F Dropdown::Desired(float availW, float availH) {
@@ -219,6 +250,10 @@ void Dropdown::Paint(PaintCtx& ctx) {
 void Dropdown::OnClickAt(float, float) {
     if (!Enabled) return;
     if (Open) { CloseMenu(); return; }
+    OpenMenu();
+}
+
+void Dropdown::OpenMenu() {
     if (Items.empty() || !Host) return;
 
     // 上一次淡出还没走完就再点开：先把旧弹层摘掉，避免同一控件挂两个菜单
@@ -226,6 +261,7 @@ void Dropdown::OnClickAt(float, float) {
         Host->RemoveOverlay(menu_.get());
         menu_.reset();
     }
+    menuRows_.clear();
     aLinear = 0.f;
     aOpen = 0.f;
 
@@ -255,6 +291,7 @@ void Dropdown::OnClickAt(float, float) {
             self->CloseMenu();
         };
         box->Add(row);
+        menuRows_.push_back(row.get());   // 键盘换选中项时要改这些行的 Selected
     }
 
     card->X = fr_.left;
@@ -269,8 +306,52 @@ void Dropdown::OnClickAt(float, float) {
     Host->SetDismiss([this]() { CloseMenu(); }, this);
 }
 
+void Dropdown::SyncMenuSelection() {
+    for (size_t i = 0; i < menuRows_.size(); ++i)
+        if (auto* r = dynamic_cast<ListRow*>(menuRows_[i]))
+            r->Selected = (int(i) == Selected);
+}
+
+void Dropdown::OnKeyDown(int vk) {
+    if (!Enabled || Items.empty()) return;
+    int n = (int)Items.size();
+    switch (vk) {
+    case VK_SPACE:
+    case VK_RETURN:
+    case VK_F4:                    // F4 / Alt+Down 是 Windows 惯例的展开键
+        if (Open) CloseMenu(); else OpenMenu();
+        return;
+    case VK_ESCAPE:
+        if (Open) CloseMenu();
+        return;
+    case VK_DOWN:
+    case VK_UP: {
+        if (!Open) { OpenMenu(); return; }
+        int d = (vk == VK_DOWN) ? 1 : -1;
+        int sel = std::clamp(Selected + d, 0, n - 1);
+        if (sel == Selected) return;
+        Selected = sel;
+        SyncMenuSelection();
+        if (Changed) Changed(Selected);   // 展开时用方向键即时生效（同 WinUI ComboBox）
+        if (Host) { Host->PlayAnim(); Host->Invalidate(); }
+        return;
+    }
+    case VK_HOME:
+    case VK_END:
+        if (!Open) return;
+        Selected = (vk == VK_HOME) ? 0 : n - 1;
+        SyncMenuSelection();
+        if (Changed) Changed(Selected);
+        if (Host) Host->Invalidate();
+        return;
+    default:
+        return;
+    }
+}
+
 void Dropdown::CloseMenu() {
     Open = false;
+    menuRows_.clear();
     if (Host) {
         Host->ClearDismissIf(this);
         Host->PlayAnim();      // 淡出同样要帧循环来推 aOpen

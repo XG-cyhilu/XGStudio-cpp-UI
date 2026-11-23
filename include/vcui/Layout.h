@@ -105,8 +105,14 @@ public:
     void OnPressAt(float x, float y) override;
     void OnDrag(float x, float y) override;
     void OnRelease(bool inside) override;
+    // 内容超过一屏才进 Tab 顺序：上下键滚一行、PgUp/PgDn 翻页、Home/End 到两端
+    bool Focusable() const override { return MaxScroll() > .5f; }
+    void OnKeyDown(int vk) override;
     CursorShape CursorAt(float x, float y) const override;
     void Paint(PaintCtx& ctx) override;
+
+    // 把一块矩形（绝对坐标）滚进视口：键盘焦点移动 / 外部定位用
+    void ScrollIntoView(D2D1_RECT_F rc);
 
     // 内容区高度 / 视口高度 / 可滚动范围（供外部做进度指示）
     float ContentHeight() const;

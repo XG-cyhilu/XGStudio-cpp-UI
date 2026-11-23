@@ -106,6 +106,12 @@ void Button::Paint(PaintCtx& ctx) {
     }
 }
 
+void Button::OnKeyDown(int vk) {
+    // Fluent 按钮：空格与回车都算激活；禁用时不响应
+    if (!Enabled) return;
+    if (vk == VK_SPACE || vk == VK_RETURN) OnClick();
+}
+
 // ---------------- Checkbox ----------------
 
 Checkbox::Checkbox(std::wstring text, bool on) : Text(std::move(text)), On(on) {
@@ -236,12 +242,14 @@ Input::Input() {
     H = 34.f;
     W = -1.f;   // 由布局决定宽度（单行时自然宽 240）
     Interactive = true;
+    FocusRing = false;   // 焦点已有 accent 描边 + 光标，再套环会双线
 }
 
 Input::Input(std::wstring placeholder) : Placeholder(std::move(placeholder)) {
     H = 34.f;
     W = -1.f;
     Interactive = true;
+    FocusRing = false;
 }
 
 D2D1_SIZE_F Input::Desired(float availW, float availH) {
@@ -635,6 +643,27 @@ void Slider::OnDrag(float x, float) {
     if (Changed) Changed(Value);
 }
 
+void Slider::OnKeyDown(int vk) {
+    if (!Enabled) return;
+    float step = (GetKeyState(VK_SHIFT) & 0x8000) ? .1f : .01f;
+    float v = Value;
+    switch (vk) {
+    case VK_LEFT:
+    case VK_DOWN:  v -= step; break;
+    case VK_RIGHT:
+    case VK_UP:    v += step; break;
+    case VK_PRIOR: v -= .1f; break;
+    case VK_NEXT:  v += .1f; break;
+    case VK_HOME:  v = 0.f; break;
+    case VK_END:   v = 1.f; break;
+    default: return;
+    }
+    v = std::clamp(v, 0.f, 1.f);
+    if (std::abs(v - Value) < 0.0001f) return;
+    Value = v;
+    if (Changed) Changed(Value);
+}
+
 // ---------------- Progress ----------------
 
 D2D1_SIZE_F Progress::Desired(float availW, float availH) {
@@ -765,6 +794,22 @@ void Segmented::OnClickAt(float x, float) {
             return;
         }
     }
+}
+
+void Segmented::OnKeyDown(int vk) {
+    if (!Enabled || Items.empty()) return;
+    int n = (int)Items.size();
+    int target = Active;
+    switch (vk) {
+    case VK_LEFT:  target = std::max(0, Active - 1); break;
+    case VK_RIGHT: target = std::min(n - 1, Active + 1); break;
+    case VK_HOME:  target = 0; break;
+    case VK_END:   target = n - 1; break;
+    default: return;
+    }
+    if (target == Active) return;
+    Active = target;
+    if (Changed) Changed(Active);
 }
 
 // ---------------- Badge ----------------

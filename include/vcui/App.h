@@ -42,7 +42,7 @@ struct AppOptions {
     std::function<void(Widget& body)> Build;
 };
 
-// 创建窗口、跑消息循环，退出时返回进程退出码。阻塞直到窗口关闭。
+// 创建窗口、跑消息循环，退出时返回进程退出码。阻塞直到最后一个窗口关闭。
 // 典型用法：return CreateAppWindow({ .Title = L"我的应用", .Width = 900 });
 //
 // 名字没叫 CreateWindow：<windows.h> 把它 #define 成了 CreateWindowW，会撞名。
@@ -51,5 +51,18 @@ VCUI_API int CreateAppWindow(const AppOptions& opt);
 // 最简重载：标题 + 尺寸（可选内容搭建）。不传 Build 就是纯空白窗口。
 VCUI_API int CreateAppWindow(std::wstring title, int width = 960, int height = 640,
                              std::function<void(Widget& body)> build = nullptr);
+
+// ---- 多窗口 ----
+// 只建窗口、不跑循环：同进程开第二个/第三个窗口时用它，
+// 把返回的 Surface 一直持有到 RunAppLoop 返回（窗口要靠它活着）。
+// 已替你把 DPI 感知、主题、标题栏、内容区都装好，和 CreateAppWindow 完全同构。
+VCUI_API std::unique_ptr<Surface> CreateAppSurface(const AppOptions& opt);
+
+// 进程级共享消息循环：同线程所有窗口共用一条，给所有有动画的窗口推帧。
+// 最后一个窗口关闭时返回（返回码 0）。重复调用没有意义，一个进程只需一次。
+VCUI_API int RunAppLoop();
+
+// 请求退出：关掉全部窗口（每个窗口都会依次收到 DESTROY），循环随即返回
+VCUI_API void QuitApp();
 
 } // namespace vcui

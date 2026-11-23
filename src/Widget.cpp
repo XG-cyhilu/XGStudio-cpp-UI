@@ -42,7 +42,11 @@ float EaseDecelerate(float p) {
     return BezAxis(t, y1, y2);
 }
 
-Widget::~Widget() = default;
+Widget::~Widget() {
+    // 被销毁的控件必须让宿主机把悬停/按下/焦点/提示这些裸指针放开，
+    // 否则"切页重建子导航"这类操作会留下悬空指针，下一帧绘制就画到已释放内存。
+    if (Host) Host->ForgetWidget(this);
+}
 
 Widget& Widget::Add(std::shared_ptr<Widget> child) {
     if (!child) return *this;

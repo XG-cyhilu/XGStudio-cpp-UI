@@ -60,6 +60,8 @@ public:
 
     D2D1_SIZE_F Desired(float availW, float availH) override;
     void Paint(PaintCtx& ctx) override;
+    // 空格 / 回车激活（Fluent 按钮的标准键盘行为）
+    void OnKeyDown(int vk) override;
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     bool Focusable() const override { return true; }
 };
@@ -157,6 +159,8 @@ public:
     // 按下即跳到该位置（Fluent 滑块行为），否则只能先按住再拖
     void OnPressAt(float x, float y) override;
     void OnDrag(float x, float y);
+    // 方向键步进 1%（按住 Shift 10%），Home / End 到两端，PgUp / PgDn 10%
+    void OnKeyDown(int vk) override;
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     bool Focusable() const override { return true; }
     std::function<void(float)> Changed;
@@ -189,6 +193,8 @@ public:
     bool Update(float dt) override;
     void OnClickAt(float x, float y) override;
     void OnHover(bool on) override;
+    // 左右方向键切换段，Home / End 跳到首尾
+    void OnKeyDown(int vk) override;
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     bool Focusable() const override { return true; }
     std::function<void(int)> Changed;
@@ -221,6 +227,9 @@ public:
     void Paint(PaintCtx& ctx) override;
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     void OnClick() override;
+    // 回车 / 空格相当于点击（侧栏导航可以用键盘走）
+    void OnKeyDown(int vk) override;
+    bool Focusable() const override { return true; }
 };
 
 // 列表行：标题 + 副标题 + 右侧文字。
@@ -249,6 +258,7 @@ public:
     void Paint(PaintCtx& ctx) override;
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     bool Focusable() const override { return true; }
+    void OnKeyDown(int vk) override;   // 空格 / 回车激活
 };
 
 // 下拉框：按钮部分自绘，菜单通过 Surface 的 Overlay 层显示。
@@ -260,7 +270,7 @@ public:
     float aOpen = 0.f;
     float MenuWidth = -1.f;   // < 0 取自身宽度
 
-    Dropdown() { H = 34.f; }
+    Dropdown() { H = 34.f; FocusRing = false; }   // 展开/聚焦已有 accent 描边
     explicit Dropdown(std::vector<std::wstring> items, int selected = 0);
 
     D2D1_SIZE_F Desired(float availW, float availH) override;
@@ -269,12 +279,17 @@ public:
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
     bool Focusable() const override { return true; }
     void OnClickAt(float x, float y) override;
+    // 空格 / 回车 / F4 展开或收起；展开时上下键换选中项（立即生效）
+    void OnKeyDown(int vk) override;
     void CloseMenu();
     std::function<void(int)> Changed;
 
 private:
     std::shared_ptr<Widget> menu_;
-    float aLinear = 0.f;   // 线性进度 0..1，驱动 aOpen 的 smoothstep
+    std::vector<Widget*> menuRows_;   // 菜单项（弱引用式的裸指针，随 menu_ 一起销毁）
+    float aLinear = 0.f;              // 线性进度 0..1，驱动 aOpen 的 smoothstep
+    void OpenMenu();
+    void SyncMenuSelection();
 };
 
 // ---------------- 反馈类 ----------------

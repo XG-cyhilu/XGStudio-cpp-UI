@@ -89,6 +89,7 @@ if (VCUI_BUILD_DEMO)
 
     vcui_add_demo(VCUIDemo demo/main.cpp)        # 全控件展示
     vcui_add_demo(VCUIMinimal demo/minimal.cpp)  # 最小用法示例
+    vcui_add_demo(VCUIMultiWin demo/multiwin.cpp)  # 多窗口 + 共享消息循环
     vcui_add_demo(VCUIFrameDemo demo/frame.cpp)  # 自绘边框 + 启动器排版打样
 
     # 无窗口布局自检：只算几何，打印每个节点的 frame 并统计越界

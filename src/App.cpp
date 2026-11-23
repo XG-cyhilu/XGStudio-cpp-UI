@@ -19,23 +19,29 @@
 
 #include "vcui/App.h"
 
+#include <dwmapi.h>
+#include <vector>
+
 namespace vcui {
 
-int CreateAppWindow(const AppOptions& opt) {
+namespace {
+
+// 组装窗口骨架（DPI → Surface → 主题 → TitleBar + body），已 Create 好、未跑循环。
+std::unique_ptr<Surface> BuildWindow(const AppOptions& opt) {
     // DPI 感知必须在任何窗口创建之前设置；重复调用无副作用
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    Surface app;
+    auto app = std::make_unique<Surface>();
     // 最小尺寸不能把请求尺寸顶上去，否则小窗口会被强行放大
     int minW = opt.MinWidth < opt.Width ? opt.MinWidth : opt.Width;
     int minH = opt.MinHeight < opt.Height ? opt.MinHeight : opt.Height;
-    app.SetMinSize(minW, minH);
-    app.SetCustomFrame(opt.CustomFrame);
-    if (!app.Create(opt.Title, opt.Width, opt.Height, opt.Dark)) return 1;
+    app->SetMinSize(minW, minH);
+    app->SetCustomFrame(opt.CustomFrame);
+    if (!app->Create(opt.Title, opt.Width, opt.Height, opt.Dark)) return nullptr;
 
     // Create 之后再刷新主题：窗口类与首帧都用最终主题
-    app.Th().Set(opt.Pal, opt.Dark);
-    if (opt.Accent.a > 0.f) app.SetAccent(opt.Accent);
+    app->Th().Set(opt.Pal, opt.Dark);
+    if (opt.Accent.a > 0.f) app->SetAccent(opt.Accent);
 
     auto root = VBox(0.f);
 
@@ -43,8 +49,9 @@ int CreateAppWindow(const AppOptions& opt) {
         auto bar = std::make_shared<TitleBar>();
         bar->Title = opt.Title;
         bar->Fill = opt.TitleBarFill;
-        bar->OnCloseRequested = [&app]() {
-            app.Close();
+        Surface* host = app.get();
+        bar->OnCloseRequested = [host]() {
+            host->Close();
             return true;
         };
         root->Add(bar);
@@ -53,11 +60,76 @@ int CreateAppWindow(const AppOptions& opt) {
     auto body = VBox(0.f);
     body->Grow = 1.f;                 // 吃掉标题栏以下全部高度
     body->Pad(opt.BodyPad);
-    if (opt.Build) opt.Build(*body);
     root->Add(body);
 
-    app.SetRoot(root);
-    return app.Run();
+    // 先把骨架挂到 Surface（AttachTree 会注入 Host/GFX），再跑用户的 Build：
+    // 这样回调里 body.Host / body.GFX 已经可用，能立刻查主题、挂弹层、开新窗口。
+    app->SetRoot(root);
+    if (opt.Build) opt.Build(*body);
+    return app;
+}
+
+} // namespace
+
+std::unique_ptr<Surface> CreateAppSurface(const AppOptions& opt) {
+    return BuildWindow(opt);
+}
+
+int RunAppLoop() {
+    MSG msg{};
+    LARGE_INTEGER freq, last;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&last);
+
+    for (;;) {
+        // 消息优先：把所有已排队的消息处理干净（含本进程所有窗口）
+        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) return (int)msg.wParam;
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+
+        // 有没有窗口需要推帧（入场动画、悬停缓动、光标闪烁都算）
+        bool anyAnim = false;
+        for (Surface* s : detail::LiveSurfaces()) {
+            if (s->Animating()) { anyAnim = true; break; }
+        }
+
+        if (anyAnim) {
+            LARGE_INTEGER now;
+            QueryPerformanceCounter(&now);
+            float dt = float(now.QuadPart - last.QuadPart) / float(freq.QuadPart);
+            last = now;
+            if (dt <= 0.f) dt = .008f;
+
+            std::vector<HWND> dirty;
+            // 拷一份再遍历：Pump 里可能因为对话框关闭而销毁覆盖层甚至窗口
+            std::vector<Surface*> live = detail::LiveSurfaces();
+            for (Surface* s : live) {
+                if (!s->Animating()) continue;
+                s->Pump(dt);
+                if (HWND h = s->Hwnd()) dirty.push_back(h);
+            }
+            for (HWND h : dirty) UpdateWindow(h);   // 只处理各自标脏的那块
+            DwmFlush();                              // 跟 DWM 合成节拍对齐，锁帧不抖
+        } else {
+            MsgWaitForMultipleObjectsEx(0, nullptr, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            last = LARGE_INTEGER{};
+            QueryPerformanceCounter(&last);
+        }
+    }
+}
+
+void QuitApp() {
+    // 拷贝一份：Close 会同步触发 DESTROY，注册表在回调里就被改写
+    std::vector<Surface*> live = detail::LiveSurfaces();
+    for (Surface* s : live) s->Close();
+}
+
+int CreateAppWindow(const AppOptions& opt) {
+    auto app = CreateAppSurface(opt);
+    if (!app) return 1;
+    return RunAppLoop();
 }
 
 int CreateAppWindow(std::wstring title, int width, int height,

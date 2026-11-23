@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "vcui/Surface.h"
+#include "vcui/App.h"
 #include <dwmapi.h>
 #include <windowsx.h>
 #include <imm.h>
@@ -24,6 +25,10 @@
 namespace vcui {
 
 namespace {
+
+// 活动窗口注册表：多窗口共用一条消息循环时，帧推进要遍历所有窗口。
+std::vector<Surface*> g_surfaces;
+int g_liveWindows = 0;
 
 // 深色标题栏。20 是 Win10 1809+ 的属性号，19 是更早的预览版编号；
 // 设置后必须让 DWM 重算一次非客户区，否则已创建的窗口不会立刻换色。
@@ -53,8 +58,21 @@ static Widget* HitAnyDecorative(Widget* w, float x, float y) {
 
 } // namespace
 
+namespace detail {
+const std::vector<Surface*>& LiveSurfaces() { return g_surfaces; }
+} // namespace detail
+
 Surface::Surface() = default;
-Surface::~Surface() = default;
+
+Surface::~Surface() {
+    if (hwnd_ && !destroyed_) {
+        DestroyWindow(hwnd_);       // 会回调 Handle(WM_DESTROY)（Quit 计数在那里减）
+    }
+    hwnd_ = nullptr;
+    for (auto it = g_surfaces.begin(); it != g_surfaces.end(); ++it) {
+        if (*it == this) { g_surfaces.erase(it); break; }
+    }
+}
 
 bool Surface::Create(const std::wstring& title, int width, int height, bool dark) {
     HINSTANCE inst = GetModuleHandleW(nullptr);
@@ -108,6 +126,10 @@ bool Surface::Create(const std::wstring& title, int width, int height, bool dark
     GetClientRect(hwnd_, &cr);
     width_ = cr.right;
     height_ = cr.bottom;
+
+    // 注册进活动窗口表：App 的共享消息循环靠它遍历所有窗口推帧
+    g_surfaces.push_back(this);
+    ++g_liveWindows;
 
     ShowWindow(hwnd_, SW_SHOW);
     UpdateWindow(hwnd_);
@@ -347,6 +369,24 @@ void Surface::CloseInfoBars() {
     PlayAnim();
 }
 
+void Surface::ForgetWidget(Widget* w) {
+    if (!w) return;
+    // 这里不回调 OnFocus(false)：对象已经在析构，不能再碰它
+    if (focus_ == w) focus_ = nullptr;
+    if (hot_ == w) hot_ = nullptr;
+    if (active_ == w) active_ = nullptr;
+    if (tipPending_ == w) tipPending_ = nullptr;
+    if (tipOwner_ == w) {
+        if (tip_) tip_->Dead = true;   // 气泡属于这个控件，一起撤掉
+        tip_.reset();
+        tipOwner_ = nullptr;
+    }
+    if (dismissOwner_ == w) {
+        dismiss_ = nullptr;
+        dismissOwner_ = nullptr;
+    }
+}
+
 void Surface::SetFocus(Widget* w) {
     if (focus_ == w) return;
     KickAnim();
@@ -358,8 +398,49 @@ void Surface::SetFocus(Widget* w) {
     if (focus_) {
         focus_->Focus = true;
         focus_->OnFocus(true);
+        EnsureVisible(focus_);      // Tab 走到屏幕外的控件时自动滚进来
     }
     Invalidate();
+}
+
+void Surface::EnsureVisible(Widget* w) {
+    if (!w) return;
+    // 从自身往上找滚动容器，让它们把这块矩形滚进视口
+    D2D1_RECT_F rc = w->Frame();
+    for (Widget* p = w->Parent; p; p = p->Parent) {
+        if (auto* sv = dynamic_cast<ScrollView*>(p)) {
+            sv->ScrollIntoView(rc);
+            KickAnim();
+        }
+    }
+}
+
+void Surface::PaintFocusRing(PaintCtx& ctx) {
+    Widget* f = focus_;
+    if (!f || !f->FocusRing || !windowActive_) return;
+    // 祖先里有隐藏的直接不画
+    for (Widget* p = f; p; p = p->Parent)
+        if (!p->Visible) return;
+    D2D1_RECT_F fr = f->Frame();
+    if (fr.right <= fr.left || fr.bottom <= fr.top) return;
+
+    // 焦点环会被滚动容器裁掉一部分：按最近一层裁剪矩形夹一次
+    D2D1_RECT_F clip{ -1e6f, -1e6f, 1e6f, 1e6f };
+    for (Widget* p = f->Parent; p; p = p->Parent) {
+        if (!p->Clip) continue;
+        D2D1_RECT_F c = p->Content();
+        clip.left = std::max(clip.left, c.left);
+        clip.top = std::max(clip.top, c.top);
+        clip.right = std::min(clip.right, c.right);
+        clip.bottom = std::min(clip.bottom, c.bottom);
+    }
+    if (clip.right <= clip.left || clip.bottom <= clip.top) return;
+
+    // Fluent：控件外扩 2px 的 2px accent 描边（浅色下也够对比度）
+    D2D1_RECT_F ring{ std::max(fr.left - 2.f, clip.left), std::max(fr.top - 2.f, clip.top),
+                      std::min(fr.right + 2.f, clip.right), std::min(fr.bottom + 2.f, clip.bottom) };
+    if (ring.right <= ring.left || ring.bottom <= ring.top) return;
+    ctx.g.StrokeRect(ring, theme_.m.radiusBtn + 2.f, theme_.t.accent, 2.f);
 }
 
 void Surface::CollectFocusable(Widget* w, std::vector<Widget*>& out) {
@@ -369,8 +450,14 @@ void Surface::CollectFocusable(Widget* w, std::vector<Widget*>& out) {
 }
 
 void Surface::CycleFocus(bool back) {
+    // Tab 的作用域：有模态（FillHost 覆盖层，比如对话框）时只在最上面那层里转，
+    // 否则会跑到被遮罩盖住的页面控件上
+    Widget* scope = nullptr;
+    for (auto it = overlays_.rbegin(); it != overlays_.rend(); ++it) {
+        if ((*it)->FillHost) { scope = it->get(); break; }
+    }
     std::vector<Widget*> all;
-    CollectFocusable(root_.get(), all);
+    CollectFocusable(scope ? scope : root_.get(), all);
     if (all.empty()) return;
     int idx = -1;
     for (size_t i = 0; i < all.size(); ++i)
@@ -446,6 +533,8 @@ void Surface::Paint() {
         else o->Arrange(D2D1_RECT_F{ o->X, o->Y, o->X + o->W, o->Y + o->H });
         o->PaintTree(ctx);
     }
+
+    PaintFocusRing(ctx);   // 焦点环画在最后，压在所有内容之上
 
     if (partial) g_.PopClip();
     HRESULT hr = g_.rt->EndDraw();
@@ -715,17 +804,45 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
     }
 
     case WM_KEYDOWN: {
-        if (wp == VK_TAB) {
+        if (wp == VK_TAB) {                       // 焦点环走一遍可聚焦控件
             CycleFocus((GetKeyState(VK_SHIFT) & 0x8000) != 0);
             return 0;
         }
         if (wp == VK_ESCAPE) {
-            if (dismiss_) { auto fn = dismiss_; dismiss_ = nullptr; fn(); }
-            return 0;
+            HideTooltip();
+            if (dismiss_) {                       // 先关最上层弹层 / 对话框
+                auto fn = dismiss_;
+                dismiss_ = nullptr;
+                dismissOwner_ = nullptr;
+                fn();
+                KickAnim();
+                Invalidate();
+                return 0;
+            }
         }
         if (focus_) focus_->OnKeyDown((int)wp);
         Invalidate();
         return 0;
+    }
+
+    case WM_SYSKEYDOWN: {
+        // Alt+Down / Alt+Up 是下拉框的"展开/收起"标准快捷键，只转发这两键，
+        // 其余交给系统（Alt+F4 关闭、Alt+Space 系统菜单）
+        if ((GetKeyState(VK_MENU) & 0x8000) && focus_ && (wp == VK_DOWN || wp == VK_UP)) {
+            focus_->OnKeyDown(wp == VK_DOWN ? VK_F4 : VK_ESCAPE);
+            Invalidate();
+            return 0;
+        }
+        break;
+    }
+
+    case WM_ACTIVATE: {
+        bool active = LOWORD(wp) != WA_INACTIVE;
+        if (active != windowActive_) {
+            windowActive_ = active;
+            Invalidate();                         // 失焦时不画焦点环
+        }
+        break;
     }
 
     case WM_CHAR: {
@@ -760,46 +877,21 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         KillTimer(hwnd_, 1);
         KillTimer(hwnd_, 2);
         g_.DropResources();
-        PostQuitMessage(0);
+        destroyed_ = true;    // hwnd_ 保留（WndProcThunk 还会用到），但析构时不再重复 DestroyWindow
+        // 多窗口：只有最后一个窗口关掉才结束消息循环，否则关一个窗整进程就退了
+        if (--g_liveWindows <= 0) {
+            g_liveWindows = 0;
+            PostQuitMessage(0);
+        }
         return 0;
     }
     return DefWindowProcW(hwnd_, msg, wp, lp);
 }
 
 int Surface::Run() {
-    MSG msg{};
-    LARGE_INTEGER freq, last;
-    QueryPerformanceFrequency(&freq);
-    QueryPerformanceCounter(&last);
-    animLast_ = GetTickCount64();
-
-    for (;;) {
-        // 消息优先：把所有已排队的消息处理干净
-        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            if (msg.message == WM_QUIT) return (int)msg.wParam;
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-
-        if (animating_) {
-            LARGE_INTEGER now;
-            QueryPerformanceCounter(&now);
-            float dt = float(now.QuadPart - last.QuadPart) / float(freq.QuadPart);
-            last = now;
-            if (dt <= 0.f) dt = .008f;
-            LARGE_INTEGER t0;
-            QueryPerformanceCounter(&t0);
-            Tick(dt);
-            (void)t0;
-            if (hwnd_) UpdateWindow(hwnd_);   // 只处理 Tick 标脏的那块
-            // 用 DWM 合成节拍锁帧，保证每帧等长、不抖
-            DwmFlush();
-        } else {
-            MsgWaitForMultipleObjectsEx(0, nullptr, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
-            last = LARGE_INTEGER{};
-            QueryPerformanceCounter(&last);
-        }
-    }
+    // 单窗口也走 App 的共享循环：同一个进程里再开窗口时只有一条消息循环，
+    // 否则第二个窗口的消息没人 Pump，等于卡死。
+    return RunAppLoop();
 }
 
 } // namespace vcui

@@ -84,6 +84,12 @@ public:
     // 唤醒动画帧循环（输入事件后调用；没有动画时会自行停掉）
     void KickAnim();
 
+    // ---- 帧驱动（多窗口共用一条消息循环时用）----
+    // 有动画在跑（需要 60fps 推进）时返回 true
+    bool Animating() const { return animating_; }
+    // 推进一帧（由 App 的共享循环调用；单窗口时 Surface::Run 内部自己调）
+    void Pump(float dt) { Tick(dt); }
+
     // 客户区尺寸（DIP）。弹层定位用，比如对话框铺满、提示条贴右上角。
     D2D1_SIZE_F ClientSize() const {
         return D2D1::SizeF(float(width_) / scale_, float(height_) / scale_);
@@ -97,6 +103,9 @@ public:
     float InfoBarWidth() const { return infoBarWidth_; }
 
 private:
+    friend class Widget;   // Widget 析构时要把裸指针从下面这些槽里摘掉
+    void ForgetWidget(Widget* w);
+
     static LRESULT CALLBACK WndProcThunk(HWND, UINT, WPARAM, LPARAM);
     LRESULT Handle(UINT msg, WPARAM wp, LPARAM lp);
 
@@ -107,6 +116,10 @@ private:
     Widget* HitAt(float x, float y, bool* inOverlay = nullptr);
     void CollectFocusable(Widget* w, std::vector<Widget*>& out);
     void CycleFocus(bool back);
+    // 键盘焦点移到屏幕外时，让最近的滚动祖先把它滚进来
+    void EnsureVisible(Widget* w);
+    // 焦点环（Fluent 的 2px accent 外描边），在整棵树画完后叠加
+    void PaintFocusRing(PaintCtx& ctx);
     // 悬停提示：WM_MOUSEMOVE 在 hot 变化时排定，600ms 后由 WM_TIMER 弹出
     void ArmTooltip(Widget* w);
     void ShowTooltipFor(Widget* w);
@@ -127,6 +140,8 @@ private:
     int minW_ = 0, minH_ = 0;
     bool customFrame_ = false;
     float resizeBorder_ = 6.f;
+    bool windowActive_ = true;            // 窗口在前台时才画焦点环
+    bool destroyed_ = false;              // 已收到 WM_DESTROY（析构时别再 DestroyWindow）
     bool mouseDown_ = false;
     float downX_ = 0.f, downY_ = 0.f;
     bool dragging_ = false;
@@ -151,4 +166,14 @@ private:
     bool showStats_ = false;
 };
 
+} // namespace vcui
+
+namespace vcui {
+namespace detail {
+
+// 内部：活动 Surface 注册表。多窗口共用一条消息循环时，App 靠它遍历所有窗口
+// 推帧。库外不要调用（生命周期由 Create / 析构自动维护）。
+VCUI_API const std::vector<Surface*>& LiveSurfaces();
+
+} // namespace detail
 } // namespace vcui

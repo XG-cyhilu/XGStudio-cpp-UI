@@ -154,6 +154,7 @@ void InfoBar::StartExit() {
 Dialog::Dialog() {
     Interactive = true;   // 吃掉遮罩上的点击，避免穿透到页面
     FillHost = true;
+    FocusRing = false;    // 卡片按钮自己会画，遮罩层不需要环
 }
 
 D2D1_SIZE_F Dialog::Desired(float, float) {
@@ -256,6 +257,7 @@ std::shared_ptr<Dialog> Dialog::Open(Surface* host, std::wstring title, std::wst
     auto gap = std::make_shared<Widget>();
     gap->Grow = 1.f;
     row->Add(gap);
+    Widget* firstBtn = nullptr;
     for (auto& a : dlg->Actions) {
         auto btn = std::make_shared<Button>(a.Text, a.Primary);
         btn->Danger = a.Danger;
@@ -267,6 +269,7 @@ std::shared_ptr<Dialog> Dialog::Open(Surface* host, std::wstring title, std::wst
             d->Close();
         };
         row->Add(btn);
+        if (!firstBtn || a.Primary) firstBtn = btn.get();   // 主按钮优先接管焦点
     }
     col->Add(row);
 
@@ -274,6 +277,8 @@ std::shared_ptr<Dialog> Dialog::Open(Surface* host, std::wstring title, std::wst
     // Esc 关闭：借 Surface 的 dismiss 通道（遮罩覆盖全窗，不会误触发外点收起）
     std::shared_ptr<Dialog> keep = dlg;
     host->SetDismiss([keep]() { keep->Close(); }, dlg.get());
+    // 键盘可用：打开即把焦点给主按钮，回车直接确认、Tab 可在按钮间切换
+    if (firstBtn) host->SetFocus(firstBtn);
     host->PlayAnim();
     host->Invalidate();
     return dlg;

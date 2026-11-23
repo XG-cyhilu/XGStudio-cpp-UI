@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "vcui/Layout.h"
+#include "vcui/Surface.h"
 #include <algorithm>
 #include <cmath>
 
@@ -303,6 +304,7 @@ ScrollView::ScrollView() {
     Clip = true;
     Grow = 1.f;
     Interactive = true;
+    FocusRing = false;   // 焦点只是为了键盘滚动，不该给整个视口套一圈描边
 }
 
 D2D1_SIZE_F ScrollView::Desired(float availW, float availH) {
@@ -375,6 +377,38 @@ bool ScrollView::Update(float dt) {
 void ScrollView::OnWheel(float dy, float, float) {
     TargetY -= dy * 48.f;
     TargetY = std::clamp(TargetY, 0.f, MaxScroll());
+    barHold_ = .9f;
+}
+
+void ScrollView::OnKeyDown(int vk) {
+    float page = ViewHeight() * .9f;
+    float next = TargetY;
+    switch (vk) {
+    case VK_UP:    next -= 48.f; break;
+    case VK_DOWN:  next += 48.f; break;
+    case VK_PRIOR: next -= page; break;
+    case VK_NEXT:  next += page; break;
+    case VK_HOME:  next = 0.f; break;
+    case VK_END:   next = MaxScroll(); break;
+    default: return;
+    }
+    next = std::clamp(next, 0.f, MaxScroll());
+    if (std::abs(next - TargetY) < .5f && std::abs(next - ScrollY) < .5f) return;
+    TargetY = next;
+    barHold_ = .9f;
+    if (Host) { Host->PlayAnim(); Host->InvalidateRectD(fr_); }
+}
+
+void ScrollView::ScrollIntoView(D2D1_RECT_F rc) {
+    D2D1_RECT_F in = Content();
+    float pad = 6.f;              // 别让焦点控件贴着视口边缘
+    float next = TargetY;
+    // rc 是内容在绝对坐标下当前的位置，直接和视口比
+    if (rc.top < in.top + pad) next -= (in.top + pad) - rc.top;
+    else if (rc.bottom > in.bottom - pad) next += rc.bottom - (in.bottom - pad);
+    next = std::clamp(next, 0.f, MaxScroll());
+    if (std::abs(next - TargetY) < .5f) return;
+    TargetY = next;
     barHold_ = .9f;
 }
 
