@@ -92,6 +92,9 @@ public:
     // 右上角提示条（Toast）。堆叠显示，到期自动淡出；返回的可忽略。
     void ShowInfoBar(const std::wstring& text, InfoTone tone = InfoTone::Info, float seconds = 3.f);
     void CloseInfoBars();
+    // 提示条统一宽度（DIP）。文字超宽会省略，悬停显示完整提示。
+    void SetInfoBarWidth(float dip) { infoBarWidth_ = dip > 140.f ? dip : 140.f; }
+    float InfoBarWidth() const { return infoBarWidth_; }
 
 private:
     static LRESULT CALLBACK WndProcThunk(HWND, UINT, WPARAM, LPARAM);
@@ -131,6 +134,7 @@ private:
     Widget* tipOwner_ = nullptr;           // 触发提示的控件
     Widget* tipPending_ = nullptr;         // 已排定、尚未到时间的控件
     std::vector<std::shared_ptr<InfoBar>> bars_;
+    float infoBarWidth_ = 360.f;          // 提示条统一宽度
     int width_ = 0, height_ = 0;
     bool animating_ = false;
     unsigned long long animLast_ = 0;

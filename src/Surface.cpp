@@ -328,10 +328,13 @@ void Surface::LayoutInfoBars() {
 void Surface::ShowInfoBar(const std::wstring& text, InfoTone tone, float seconds) {
     if (text.empty()) return;
     auto bar = std::make_shared<InfoBar>(text, tone, std::max(600.f, seconds * 1000.f));
+    // 统一宽度：所有提示条一样长，超宽文字省略；被截断时悬停看全文
+    bar->W = infoBarWidth_;
     AddOverlay(bar);                       // 先挂上，才有 GFX 可以量字宽
-    D2D1_SIZE_F d = bar->Desired(420.f, 60.f);
-    bar->W = d.width;
+    D2D1_SIZE_F d = bar->Desired(infoBarWidth_, 60.f);
     bar->H = d.height;
+    float textArea = infoBarWidth_ - 82.f;
+    if (g_.Ready() && g_.TextW(text, 14.f, 400) > textArea - 2.f) bar->Tooltip = text;
     bars_.push_back(bar);
     LayoutInfoBars();
     if (hwnd_) SetTimer(hwnd_, 2, 150, nullptr);

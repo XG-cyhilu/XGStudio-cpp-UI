@@ -306,7 +306,7 @@ t2->UseType(Type::Body1);                      // 14 / 20 Regular
 | `IconButton` | `Glyph`、`GlyphSize`、`Ghost`、`Clicked` |
 | `Dropdown` | `Items`、`Selected`、`MenuWidth`、`Changed(int)` |
 | `Tooltip` | 一般不用手动建：给任意控件设 `Widget::Tooltip = L"…"`，悬停 600ms 由 Surface 弹出 |
-| `InfoBar` | 由 `Surface::ShowInfoBar(text, InfoTone::Info/Success/Warning/Danger, 秒)` 创建；右上角堆叠、可点 ✕ 关闭、到期自动淡出，悬停暂停计时 |
+| `InfoBar` | 由 `Surface::ShowInfoBar(text, InfoTone::Info/Success/Warning/Danger, 秒)` 创建；右上角堆叠、宽度统一（`SetInfoBarWidth`，默认 360），超宽文字省略、悬停弹出完整提示；可点 ✕ 关闭、到期自动淡出，悬停暂停计时 |
 | `Dialog` | `Dialog::Open(host, 标题, 正文, { DialogAction{文本, Primary, Danger, 回调} }, 点遮罩是否关闭, 卡片宽)`；全屏遮罩 + 居中卡片，Esc / 点遮罩关闭，按钮回调先执行再关闭 |
 | `TitleBar` | `Title`、`BtnWidth`、`ShowMinimize/Maximize/Close`、`Fill`、`OnCloseRequested`；非按钮区整条作为拖动区，双击可最大化。顶栏导航：`NavItems`、`NavIndex`、`NavCentered`、`NavGap`、`NavChanged(int)`——选中项用胶囊底高亮 |
 
@@ -329,6 +329,7 @@ Dialog::Open(&app, L"删除这个实例？", L"实例目录、版本 JSON 与存
 实现要点：
 
 - 提示条计时靠 `WM_TIMER`，静止时没有帧循环也不会卡住；淡入淡出走 `Opacity`，右侧 24dip 滑入
+- 提示条统一宽度（`app.SetInfoBarWidth(360)`，默认 360），文字超出用「…」截断；被截断那条自动带 `Tooltip = 全文`，悬停即可看全
 - 对话框覆盖层设 `FillHost = true`，每次绘制按当前客户区重排，窗口缩放时遮罩和卡片自动居中
 - 遮罩本身 `Interactive = true`，点击不会穿透到下面的页面；点卡片内部不算“外面”，所以遮罩不会误关
 - `Esc` 走 Surface 的 dismiss 通道，关闭时不会残留 `dismiss_`

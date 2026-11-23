@@ -335,6 +335,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             };
             frow->Add(wbtn);
 
+            auto lbtn = std::make_shared<Button>(L"长文本提示");
+            lbtn->Clicked = [&app]() {
+                app.ShowInfoBar(L"实例 meta 校验失败：第 3 行 readingSpeed 不是数字，已跳过该条目并继续扫描",
+                               InfoTone::Danger, 5.f);
+            };
+            frow->Add(lbtn);
+
             auto dbtn = std::make_shared<Button>(L"打开对话框", true);
             dbtn->Clicked = [&app]() {
                 Dialog::Open(&app, L"删除这个实例？",
