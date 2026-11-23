@@ -35,6 +35,7 @@ set(VCUI_SOURCES
     src/Color.cpp
     src/Theme.cpp
     src/Gfx.cpp
+    src/App.cpp
     src/Widget.cpp
     src/Layout.cpp
     src/Controls.cpp

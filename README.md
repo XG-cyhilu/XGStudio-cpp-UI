@@ -183,6 +183,52 @@ vcpkg install vcui --overlay-ports=path/to/port
 
 把 `include/` 加进头文件搜索路径，链接 `vcui.lib` 和上面那串系统库。
 
+## 快速开始
+
+一行起窗，DPI 感知、自绘边框、库自己的标题栏（三系统按钮 + 可拖拽）都由库包好：
+
+```cpp
+#include "vcui/vcui.h"
+
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    // 纯空白窗口
+    return vcui::RunApp(L"我的应用", 960, 640);
+}
+```
+
+要内容时把回调带上，拿到的 `body` 是标题栏下面的内容区（已 `Grow = 1` 铺满）：
+
+```cpp
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    return vcui::RunApp(L"我的应用", 960, 640, [](vcui::Widget& body) {
+        auto page = vcui::VBox(14.f);
+        page->Pad(24.f);
+        page->Add(std::make_shared<vcui::Label>(L"Hello", 20.f, 600));
+        auto btn = std::make_shared<vcui::Button>(L"确定", true);
+        btn->Clicked = []{ /* … */ };
+        page->Add(btn);
+        body.Add(page);
+    });
+}
+```
+
+需要更多控制（深色、色板、强调色、不要标题栏、窗口最小尺寸）时用结构体版本：
+
+```cpp
+vcui::AppOptions o;
+o.Title = L"设置";
+o.Width = 900; o.Height = 620;
+o.Dark = true;
+o.Pal = vcui::Palette::GitHub;
+o.Accent = vcui::Hex(0x7C4DFF);
+o.TitleBar = false;            // 不要库的标题栏，自己做
+o.BodyPad = 20.f;
+o.Build = [](vcui::Widget& body) { /* … */ };
+return vcui::RunApp(o);
+```
+
+`RunApp` 内部就是：`Surface` → `SetMinSize` / `SetCustomFrame` → `Create` → `Theme::Set` / `SetAccent` → `TitleBar` + 内容 `VBox` → `Run()`。想自己掌控生命周期（多窗口、先建窗再异步灌内容）就继续直接用 `Surface`，两条路径完全等价。
+
 ## 核心概念
 
 ### Surface
@@ -204,6 +250,9 @@ vcpkg install vcui --overlay-ports=path/to/port
 | `SetDismiss(fn, owner)` | 点覆盖层外面时的回调 |
 | `Invalidate()` / `InvalidateRectD(rc)` | 整窗 / 局部重绘 |
 | `KickAnim()` | 唤醒动画帧循环 |
+| `ClientSize()` | 客户区尺寸（DIP），覆盖层定位用 |
+| `ShowInfoBar` / `CloseInfoBars` / `SetInfoBarWidth` | 右上角提示条 |
+| `RunApp(AppOptions)` | 一键建窗 + 标题栏 + 内容区 + 消息循环（见「快速开始」） |
 
 ### Widget
 

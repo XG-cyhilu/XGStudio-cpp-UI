@@ -14,18 +14,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// 最小可运行示例：一个窗口 + 一棵控件树，全部通过公开头文件 API 完成。
+// 最小示例：RunApp 一行起窗口（DPI、自绘边框、标题栏都由库包好），
+// 回调里拿到的 body 就是标题栏下面的内容区。
 #include <windows.h>
 #include "vcui/vcui.h"
 
 using namespace vcui;
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-
-    Surface app;
-    if (!app.Create(L"XGStudio-cpp-UI — Minimal", 520, 340, false)) return 1;
-
+static void BuildPage(Widget& body) {
     auto page = VBox(14.f);
     page->Pad(24.f);
 
@@ -36,6 +32,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     auto box = VBox(12.f);
     box->Add(std::make_shared<Label>(L"输入", 12.f, 600));
     box->Add(std::make_shared<Input>(L"输入点什么…"));
+
     auto row = HBox(10.f);
     row->Add(std::make_shared<Switch>(true));
     auto ok = std::make_shared<Button>(L"确定", true);
@@ -43,8 +40,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     row->Add(ok);
     box->Add(row);
     card->Add(box);
-    page->Add(card);
 
-    app.SetRoot(page);
-    return app.Run();
+    page->Add(card);
+    body.Add(page);
+}
+
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    // 只要窗口、不要内容时，连回调都可以省：
+    //     return RunApp(L"空白窗口", 720, 480);
+    return RunApp(L"XGStudio-cpp-UI — Minimal", 520, 340, BuildPage);
 }

@@ -25,6 +25,7 @@
 #include "vcui/Layout.h"
 #include "vcui/Controls.h"
 #include "vcui/Surface.h"
+#include "vcui/App.h"
 
 namespace vcui {
 
