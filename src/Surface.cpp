@@ -1,4 +1,4 @@
-// Copyright 2026 XGstudio
+﻿// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,13 +22,28 @@
 #include <cmath>
 
 namespace vcui {
+
+namespace {
+
+// 深色标题栏。20 是 Win10 1809+ 的属性号，19 是更早的预览版编号；
+// 设置后必须让 DWM 重算一次非客户区，否则已创建的窗口不会立刻换色。
+void SetCaptionDark(HWND h, bool dark) {
+    BOOL d = dark ? TRUE : FALSE;
+    if (FAILED(DwmSetWindowAttribute(h, 20, &d, sizeof(d))))
+        DwmSetWindowAttribute(h, 19, &d, sizeof(d));
+    SetWindowPos(h, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+}
+
+} // namespace
+
 Surface::Surface() = default;
 Surface::~Surface() = default;
 
 bool Surface::Create(const std::wstring& title, int width, int height, bool dark) {
     HINSTANCE inst = GetModuleHandleW(nullptr);
 
-    static const wchar_t* kClass = L"VCLKitSurface";
+    static const wchar_t* kClass = L"VCUISurface";
     static bool registered = false;
     if (!registered) {
         WNDCLASSEXW wc{};
@@ -58,15 +73,14 @@ bool Surface::Create(const std::wstring& title, int width, int height, bool dark
                             rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, inst, this);
     if (!hwnd_) return false;
 
-    BOOL d = dark ? TRUE : FALSE;
-    DwmSetWindowAttribute(hwnd_, 20, &d, sizeof(d));
+    SetCaptionDark(hwnd_, dark);
 
     if (!g_.Init(hwnd_)) return false;
     ImmAssociateContextEx(hwnd_, nullptr, IACE_DEFAULT);
     title_ = title;
     {
         wchar_t env[8];
-        showStats_ = GetEnvironmentVariableW(L"VCLKIT_FPS", env, 8) > 0;
+        showStats_ = GetEnvironmentVariableW(L"VCUI_FPS", env, 8) > 0;
     }
 
     RECT cr{};
@@ -188,8 +202,7 @@ bool Surface::Maximized() const {
 
 void Surface::SetTheme(Palette p, bool dark) {
     theme_.Set(p, dark);
-    BOOL d = dark ? TRUE : FALSE;
-    DwmSetWindowAttribute(hwnd_, 20, &d, sizeof(d));
+    SetCaptionDark(hwnd_, dark);
     Invalidate();
 }
 
@@ -333,7 +346,7 @@ void Surface::Paint() {
         g_.Present();
     }
     QueryPerformanceCounter(&q1);
-    if (showStats_) {   // 帧统计：标题栏显示 fps / 绘制耗时（设 VCLKIT_FPS=1 打开）
+    if (showStats_) {   // 帧统计：标题栏显示 fps / 绘制耗时（设 VCUI_FPS=1 打开）
         float ms = float(q1.QuadPart - q0.QuadPart) * 1000.f / float(qf.QuadPart);
         paintMsAcc_ += ms;
         ++paintFrames_;

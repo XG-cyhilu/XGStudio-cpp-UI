@@ -1,4 +1,4 @@
-// Copyright 2026 XGstudio
+﻿// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@ Tokens GetTokens(Palette p, bool dark) {
     Tokens t;
     t.dark = dark;
     if (p == Palette::Microsoft) {
-        if (dark) { t.kp = Hex(0x2b2b2b); t.bj = Hex(0x202020); t.xt = Hex(0x2d2d2d); t.jh = Hex(0x323232); t.wz = Hex(0xf7f7f7); }
-        else { t.kp = Hex(0xfbfbfb); t.bj = Hex(0xf3f3f3); t.xt = Hex(0xeaeaea); t.jh = Hex(0xededed); t.wz = Hex(0x1b1b1b); }
+        if (dark) { t.kp = Hex(0x2b2b2b); t.bj = Hex(0x202020); t.xt = Hex(0x2d2d2d); t.wz = Hex(0xf7f7f7); }
+        else { t.kp = Hex(0xfbfbfb); t.bj = Hex(0xf3f3f3); t.xt = Hex(0xeaeaea); t.wz = Hex(0x1b1b1b); }
     } else {
-        if (dark) { t.kp = Hex(0x0c1117); t.bj = Hex(0x000409); t.xt = Hex(0x1e242a); t.jh = Hex(0x14191f); t.wz = Hex(0xeef6fc); }
-        else { t.kp = Hex(0xffffff); t.bj = Hex(0xf5f8fa); t.xt = Hex(0xf2f3f5); t.jh = Hex(0xe9edf1); t.wz = Hex(0x1e2328); }
+        if (dark) { t.kp = Hex(0x0c1117); t.bj = Hex(0x000409); t.xt = Hex(0x1e242a); t.wz = Hex(0xeef6fc); }
+        else { t.kp = Hex(0xffffff); t.bj = Hex(0xf5f8fa); t.xt = Hex(0xf2f3f5); t.wz = Hex(0x1e2328); }
     }
 
     t.accent = Hex(0x0071EA);

@@ -1,4 +1,4 @@
-// Copyright 2026 XGstudio
+﻿// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ enum class Palette { Microsoft, GitHub };
 
 struct Tokens {
     bool dark = false;
-    D2D1_COLOR_F kp{}, bj{}, xt{}, jh{}, wz{};
+    D2D1_COLOR_F kp{}, bj{}, xt{}, wz{};
     D2D1_COLOR_F accent{}, accentHover{}, accentPress{}, onAccent{}, accentSoft{}, accentSel{};
     D2D1_COLOR_F text2{}, text3{}, border{}, divider{}, panel{}, pressed{};
 };

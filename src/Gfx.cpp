@@ -1,4 +1,4 @@
-// Copyright 2026 XGstudio
+﻿// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -223,7 +223,7 @@ void Gfx::StrokeCircle(float cx, float cy, float r, D2D1_COLOR_F c, float w) {
 
 void Gfx::Shadow(D2D1_RECT_F rc, float rad, float spread, float dy, D2D1_COLOR_F c) {
     static int off = -1;
-    if (off < 0) off = GetEnvironmentVariableW(L"VCLKIT_NOSHADOW", nullptr, 0) > 0 ? 1 : 0;
+    if (off < 0) off = GetEnvironmentVariableW(L"VCUI_NOSHADOW", nullptr, 0) > 0 ? 1 : 0;
     if (off) return;
     if (!rt || c.a <= 0.f) return;
     float w = rc.right - rc.left, h = rc.bottom - rc.top;
@@ -302,7 +302,7 @@ void Gfx::PopClip() {
 void Gfx::Text(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
                HAlign ha, VAlign va) {
     static int off = -1;
-    if (off < 0) off = GetEnvironmentVariableW(L"VCLKIT_NOTEXT", nullptr, 0) > 0 ? 1 : 0;
+    if (off < 0) off = GetEnvironmentVariableW(L"VCUI_NOTEXT", nullptr, 0) > 0 ? 1 : 0;
     if (off) return;
     if (!rt || s.empty()) return;
     float w = rc.right - rc.left;

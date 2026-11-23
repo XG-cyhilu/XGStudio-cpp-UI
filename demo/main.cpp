@@ -1,4 +1,4 @@
-// Copyright 2026 XGstudio
+﻿// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,6 +50,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     Surface app;
     if (!app.Create(L"Void Craft UI — Controls", 1180, 840, false)) return 1;
 
+    // 启动状态可由环境变量指定，便于截图与无头复现：
+    //   VCUI_DEMO_DARK=1        直接进深色
+    //   VCUI_DEMO_PALETTE=github 用 GitHub 色板
+    auto env = [](const wchar_t* name) {
+        wchar_t buf[64]{};
+        GetEnvironmentVariableW(name, buf, 64);
+        return std::wstring(buf);
+    };
+    const bool startDark = env(L"VCUI_DEMO_DARK") == L"1";
+    const bool startGh = env(L"VCUI_DEMO_PALETTE") == L"github";
+
     auto root = VBox(0.f);
 
     // ---- 顶栏 ----
@@ -64,11 +75,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     header->Add(brand);
     header->Add(Spacer());
 
-    auto themeSeg = std::make_shared<Segmented>(std::vector<std::wstring>{ L"浅色", L"深色" }, 0);
+    auto themeSeg = std::make_shared<Segmented>(std::vector<std::wstring>{ L"浅色", L"深色" }, startDark ? 1 : 0);
     themeSeg->W = 148.f;
     header->Add(themeSeg);
 
-    auto palBtn = std::make_shared<Button>(L"色板：Microsoft", false);
+    auto palBtn = std::make_shared<Button>(startGh ? L"色板：GitHub" : L"色板：Microsoft", false);
     palBtn->W = 156.f;
     header->Add(palBtn);
 
@@ -219,7 +230,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         app.SetDark(i == 1);
         app.Invalidate();
     };
-    static bool gh = false;
+    static bool gh = startGh;
     palBtn->Clicked = [&app, palBtn]() {
         gh = !gh;
         app.SetTheme(gh ? Palette::GitHub : Palette::Microsoft, app.IsDark());
@@ -227,6 +238,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         app.Invalidate();
     };
 
+    app.SetTheme(startGh ? Palette::GitHub : Palette::Microsoft, startDark);
     app.SetRoot(root);
 
 
