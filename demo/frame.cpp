@@ -57,6 +57,24 @@ static std::shared_ptr<Widget> DemoHead(const std::wstring& name, const std::wst
     return col;
 }
 
+// demo 内的推进器：每隔几秒给两条定值进度条换一次目标值，让缓动过程看得见。
+// Visible=false 所以不参与排布也不绘制，但仍会被 Tick 到（Widget::Update 不按 Visible 过滤）。
+class SweepTicker : public vcui::Widget {
+public:
+    std::shared_ptr<vcui::Progress> a, b;
+    float t = 0.f;
+    bool fwd = true;
+    bool Update(float dt) override {
+        t += dt;
+        if (t < 2.4f) return false;
+        t = 0.f;
+        fwd = !fwd;
+        if (a) a->Value = fwd ? .86f : .18f;
+        if (b) b->Value = fwd ? .30f : .72f;
+        return true;
+    }
+};
+
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
@@ -295,7 +313,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
             auto b4 = VBox(10.f);
             b4->Add(DemoHead(L"Progress",
-                             L"定值进度带缓动（30% / 72%）；第三行是不确定态，accent 在轨道里循环扫过"));
+                             L"前两条定值：每 2.4s 换一次目标值，看的是指数缓动而不是硬跳；第三条是不确定态，accent 在轨道里循环"));
             auto p1 = std::make_shared<Progress>(.30f);
             p1->W = 360.f;
             auto p2 = std::make_shared<Progress>(.72f);
@@ -303,9 +321,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             auto p3 = std::make_shared<Progress>();
             p3->Indeterminate = true;      // 循环态：Phase 自己走，帧循环不会睡
             p3->W = 360.f;
+            auto sweep = std::make_shared<SweepTicker>();
+            sweep->a = p1;
+            sweep->b = p2;
+            sweep->Visible = false;        // 不占位、不绘制，只借 Tick 推进
             b4->Add(p1);
             b4->Add(p2);
             b4->Add(p3);
+            b4->Add(sweep);
             col->Add(b4);
 
             auto b5 = VBox(10.f);
