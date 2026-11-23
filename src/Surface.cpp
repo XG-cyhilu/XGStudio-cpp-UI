@@ -475,11 +475,13 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
 
         // 自绘边框：先判边缘缩放（最大化时没有可拖的边）
         if (customFrame_ && !IsZoomed(hwnd_)) {
-            RECT wr{};
-            GetWindowRect(hwnd_, &wr);
-            float b = resizeBorder_ * scale_;
-            bool L = pt.x < wr.left + (LONG)b, R = pt.x >= wr.right - (LONG)b;
-            bool T = pt.y < wr.top + (LONG)b, B = pt.y >= wr.bottom - (LONG)b;
+            // pt 已被 ScreenToClient 转成客户区坐标（物理像素），这里必须用客户区矩形比较，
+            // 拿 GetWindowRect 的屏幕坐标去比会几乎命中整窗。
+            RECT cr{};
+            GetClientRect(hwnd_, &cr);
+            int bw = (int)std::ceil(resizeBorder_ * scale_);
+            bool L = pt.x < bw, R = pt.x >= cr.right - bw;
+            bool T = pt.y < bw, B = pt.y >= cr.bottom - bw;
             if (T && L) return HTTOPLEFT;
             if (T && R) return HTTOPRIGHT;
             if (B && L) return HTBOTTOMLEFT;

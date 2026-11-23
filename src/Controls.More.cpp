@@ -65,6 +65,13 @@ void NavItem::Paint(PaintCtx& ctx) {
 
 void NavItem::OnClick() {
     if (!Enabled) return;
+    // 同一父容器下的 NavItem 视为单选组：点谁谁亮，兄弟自动熄灭
+    if (Parent) {
+        for (auto& s : Parent->Children()) {
+            auto* n = dynamic_cast<NavItem*>(s.get());
+            if (n && n != this) n->Active = false;
+        }
+    }
     Active = true;
     if (Clicked) Clicked();
 }

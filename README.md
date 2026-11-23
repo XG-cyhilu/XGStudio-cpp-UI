@@ -301,7 +301,7 @@ t2->UseType(Type::Body1);                      // 14 / 20 Regular
 | `Progress` | `Value`(0..1) |
 | `Segmented` | `Items`、`Active`、`Changed(int)` |
 | `Badge` | `Text`、`ToneKind`（Neutral/Accent/Success/Warning/Danger） |
-| `NavItem` | `Text`、`Glyph`、`Active`、`Clicked` |
+| `NavItem` | `Text`、`Glyph`、`Active`、`Clicked`；同一父容器下的 NavItem 自动构成单选组（点谁谁亮，兄弟熄灭） |
 | `ListRow` | `Title`、`Sub`、`Right`、`Selected`、`Clicked` |
 | `IconButton` | `Glyph`、`GlyphSize`、`Ghost`、`Clicked` |
 | `Dropdown` | `Items`、`Selected`、`MenuWidth`、`Changed(int)` |

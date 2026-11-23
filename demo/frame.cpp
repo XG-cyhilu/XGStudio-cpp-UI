@@ -20,6 +20,7 @@
 //   VCUI_NAV_CENTER=1     顶栏导航"最小居中"，否则整栏
 
 #include <windows.h>
+#include <functional>
 #include <vcui/vcui.h>
 
 using namespace vcui;
@@ -155,21 +156,28 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     };
 
     // 页面 1：版本（子导航：已安装 / 可安装 / 整合包）
-    auto BuildVersions = [&]() {
+    // 子导航点一下要真的换内容，所以按 tab 重建：sub 列表 + content 正文
+    int verTab = 0;
+    std::function<void(int)> ShowVersions;
+    ShowVersions = [&](int tab) {
+        verTab = tab;
         sub->Visible = true;
         sub->Clear();
-        auto n1 = std::make_shared<NavItem>(L"已安装", L"\xE8F4");
-        n1->Active = true;
-        auto n2 = std::make_shared<NavItem>(L"可安装", L"\xE896");
-        auto n3 = std::make_shared<NavItem>(L"整合包", L"\xE8F1");
-        sub->Add(n1);
-        sub->Add(n2);
-        sub->Add(n3);
+        const wchar_t* names[3] = { L"已安装", L"可安装", L"整合包" };
+        const wchar_t* glyphs[3] = { L"\xE8F4", L"\xE896", L"\xE8F1" };
+        for (int i = 0; i < 3; ++i) {
+            auto n = std::make_shared<NavItem>(names[i], glyphs[i]);
+            n->Active = (i == tab);
+            n->Clicked = [&, i]() { if (verTab != i) { ShowVersions(i); app.Invalidate(); } };
+            sub->Add(n);
+        }
 
+        content->Clear();
         auto head = HBox(12.f);
         head->H = 44.f;
         head->Cross = Stack::Center;
-        auto t = L(L"已安装的版本", Type::Subtitle1);
+        auto t = L(tab == 0 ? L"已安装的版本" : (tab == 1 ? L"可安装的版本" : L"整合包"),
+                  Type::Subtitle1);
         t->Grow = 1.f;
         auto search = std::make_shared<Input>(L"搜索版本…");
         search->W = 240.f;
@@ -186,13 +194,25 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         auto rows = VBox(0.f);
         for (int i = 0; i < 16; ++i) {
             wchar_t t2[96];
-            swprintf_s(t2, L"1.%d.4-Fabric 0.15.11-性能优化整合包", 16 + i % 5);
-            auto row = std::make_shared<ListRow>(t2, L"1.20.4  ·  Fabric 0.15.11", i == 0 ? L"已选择" : L"3 天前");
+            std::wstring sub1, right;
+            if (tab == 0) {
+                swprintf_s(t2, L"1.%d.4-Fabric 0.15.11-性能优化整合包", 16 + i % 5);
+                sub1 = L"1.20.4  ·  Fabric 0.15.11";
+                right = (i == 0 ? L"已选择" : L"3 天前");
+            } else if (tab == 1) {
+                swprintf_s(t2, L"1.%d.%d  ·  正式版", 16 + i % 6, i % 3);
+                sub1 = L"未安装  ·  约 1.2 GB";
+                right = L"下载";
+            } else {
+                swprintf_s(t2, L"流萤 1.20.1 整合包 v%d", 1 + i % 4);
+                sub1 = L"207+ Mod  ·  已安装";
+                right = L"打开";
+            }
+            auto row = std::make_shared<ListRow>(t2, sub1, right);
             row->H = 52.f;
-            row->Selected = (i == 0);
+            row->Selected = (tab == 0 && i == 0);
             rows->Add(row);
-            auto d = std::make_shared<Divider>();
-            rows->Add(d);
+            rows->Add(std::make_shared<Divider>());
         }
         listScroll->Add(rows);
         content->Add(listScroll);
@@ -235,36 +255,82 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     };
 
     // 页面 3：设置（子导航：通用 / 外观 / Java / 下载 / 关于）
-    auto BuildSettings = [&]() {
+    int setTab = 0;
+    std::function<void(int)> ShowSettings;
+    ShowSettings = [&](int tab) {
+        setTab = tab;
         sub->Visible = true;
         sub->Clear();
-        auto n1 = std::make_shared<NavItem>(L"通用", L"\xE713");
-        n1->Active = true;
-        sub->Add(n1);
-        sub->Add(std::make_shared<NavItem>(L"外观", L"\xE771"));
-        sub->Add(std::make_shared<NavItem>(L"Java 运行时", L"\xE943"));
-        sub->Add(std::make_shared<NavItem>(L"下载", L"\xE896"));
-        sub->Add(std::make_shared<NavItem>(L"关于", L"\xE946"));
+        const wchar_t* names[5] = { L"通用", L"外观", L"Java 运行时", L"下载", L"关于" };
+        const wchar_t* glyphs[5] = { L"\xE713", L"\xE771", L"\xE943", L"\xE896", L"\xE946" };
+        for (int i = 0; i < 5; ++i) {
+            auto n = std::make_shared<NavItem>(names[i], glyphs[i]);
+            n->Active = (i == tab);
+            n->Clicked = [&, i]() { if (setTab != i) { ShowSettings(i); app.Invalidate(); } };
+            sub->Add(n);
+        }
 
-        content->Add(Section(L"启动器"));
-        content->Add(FormRow(L"语言", L"简体中文"));
-        content->Add(std::make_shared<Divider>());
-        content->Add(FormRow(L"启动器版本", L"0.1.0  (dev)"));
-        content->Add(std::make_shared<Divider>());
-        auto fs = HBox(16.f);
-        fs->H = 48.f;
-        fs->Cross = Stack::Center;
-        auto lab = L(L"启动器启动时检查更新", Type::Body1);
-        lab->W = 180.f;
-        auto sw = std::make_shared<Switch>(true);
-        fs->Add(lab);
-        fs->Add(sw);
-        content->Add(fs);
+        content->Clear();
+        auto SwitchRow = [&](const std::wstring& label, bool on) {
+            auto fs = HBox(16.f);
+            fs->H = 48.f;
+            fs->Cross = Stack::Center;
+            auto lab = L(label, Type::Body1);
+            lab->W = 180.f;
+            fs->Add(lab);
+            fs->Add(std::make_shared<Switch>(on));
+            content->Add(fs);
+        };
 
-        content->Add(Section(L"游戏默认值"));
-        content->Add(FormRow(L"默认内存", L"4096 MB"));
-        content->Add(std::make_shared<Divider>());
-        content->Add(FormRow(L"默认游戏目录", L"版本目录（隔离）"));
+        switch (tab) {
+        case 0:
+            content->Add(Section(L"启动器"));
+            content->Add(FormRow(L"语言", L"简体中文"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"启动器版本", L"0.1.0  (dev)"));
+            content->Add(std::make_shared<Divider>());
+            SwitchRow(L"启动器启动时检查更新", true);
+            content->Add(Section(L"游戏默认值"));
+            content->Add(FormRow(L"默认内存", L"4096 MB"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"默认游戏目录", L"版本目录（隔离）"));
+            break;
+        case 1:
+            content->Add(Section(L"外观"));
+            content->Add(FormRow(L"主题", L"跟随系统（浅色）"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"界面缩放", L"100%"));
+            content->Add(std::make_shared<Divider>());
+            SwitchRow(L"窗口动画", true);
+            SwitchRow(L"紧凑列表行", false);
+            break;
+        case 2:
+            content->Add(Section(L"Java 运行时"));
+            content->Add(FormRow(L"当前版本", L"17.0.9  (x64)"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"路径", L"C:\\Program Files\\Java\\jdk-17.0.9"));
+            content->Add(std::make_shared<Divider>());
+            SwitchRow(L"启动时自动检测 Java", true);
+            SwitchRow(L"允许使用系统内置 JRE", false);
+            break;
+        case 3:
+            content->Add(Section(L"下载"));
+            content->Add(FormRow(L"并发连接数", L"32"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"下载源", L"BMCLAPI（镜像）"));
+            content->Add(std::make_shared<Divider>());
+            SwitchRow(L"下载完校验 SHA-1", true);
+            SwitchRow(L"失败自动重试 3 次", true);
+            break;
+        default:
+            content->Add(Section(L"关于"));
+            content->Add(FormRow(L"启动器", L"Void Craft Launcher 0.1.0"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"UI 库", L"XGStudio-cpp-UI"));
+            content->Add(std::make_shared<Divider>());
+            content->Add(FormRow(L"许可证", L"AGPL-3.0"));
+            break;
+        }
     };
 
     int curPage = -1;
@@ -274,9 +340,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         content->Clear();
         switch (idx) {
         case 0: BuildLaunch(); break;
-        case 1: BuildVersions(); break;
+        case 1: ShowVersions(verTab); break;
         case 2: BuildDownload(); break;
-        default: BuildSettings(); break;
+        default: ShowSettings(setTab); break;
         }
         app.Invalidate();
     };
