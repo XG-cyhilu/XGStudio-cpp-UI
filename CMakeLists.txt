@@ -53,6 +53,10 @@ endif()
 
 add_library(VCUI::vcui ALIAS vcui)
 
+# 公开头里有 C++17 的 inline 变量（vcui::Version），标准必须传给使用方，
+# 否则 MSVC 默认 /std:c++14 的工程一 include 就报错。
+target_compile_features(vcui PUBLIC cxx_std_17)
+
 target_include_directories(vcui PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
