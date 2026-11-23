@@ -280,7 +280,7 @@ Token 命名沿用拼音缩写（历史原因），对照如下。表中前四�
 | `ListRow` | `Title`、`Sub`、`Right`、`Selected`、`Clicked` |
 | `IconButton` | `Glyph`、`GlyphSize`、`Ghost`、`Clicked` |
 | `Dropdown` | `Items`、`Selected`、`MenuWidth`、`Changed(int)` |
-| `TitleBar` | `Title`、`BtnWidth`、`ShowMinimize/Maximize/Close`、`Fill`、`OnCloseRequested`；非按钮区整条作为拖动区，双击可最大化 |
+| `TitleBar` | `Title`、`BtnWidth`、`ShowMinimize/Maximize/Close`、`Fill`、`OnCloseRequested`；非按钮区整条作为拖动区，双击可最大化。顶栏导航：`NavItems`、`NavIndex`、`NavCentered`、`NavGap`、`NavChanged(int)`——选中项用胶囊底高亮 |
 
 ### 自绘边框窗口（TitleBar）
 
@@ -300,6 +300,15 @@ auto body = HBox(0.f);
 body->Grow = 1.f;                        // 占满标题栏以下
 root->Add(body);
 app.SetRoot(root);
+```
+
+顶栏要放导航（整栏或最小居中）时：
+
+```cpp
+bar->NavItems  = { L"启动", L"版本", L"下载", L"设置" };
+bar->NavIndex  = 0;
+bar->NavCentered = true;                // false = 紧跟标题右侧铺开
+bar->NavChanged = [](int i) { /* 切页 */ };
 ```
 
 保留 `WS_CAPTION | WS_THICKFRAME` 让 DWM 继续提供投影、吸附与最大化动画，再用 `WM_NCCALCSIZE` 吃掉非客户区；边缘缩放由库自己做命中测试（`SetResizeBorder` 调宽度），拖动靠 `TitleBar::Caption`。最大化图标会在 `TitleBar::Paint` 里跟随窗口状态切换。

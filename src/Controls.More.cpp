@@ -305,6 +305,33 @@ public:
     CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
 };
 
+// 顶栏导航项：圆角胶囊，选中用 accentSoft + accent 文字。
+class NavChip : public Widget {
+public:
+    std::wstring Text;
+    bool Active = false;
+
+    explicit NavChip(std::wstring t) : Text(std::move(t)) {
+        H = 30.f;
+        Interactive = true;
+    }
+
+    D2D1_SIZE_F Desired(float, float) override {
+        return D2D1::SizeF(W > 0 ? W : 80.f, H > 0 ? H : 30.f);
+    }
+
+    void Paint(PaintCtx& ctx) override {
+        float hov = HoverA();
+        if (Active) ctx.g.RoundRect(fr_, 6.f, ctx.t.accentSoft);
+        else if (hov > .01f) ctx.g.RoundRect(fr_, 6.f, A(CtrlHover(ctx.t), hov));
+        ctx.g.Text(fr_, Text, 13.f, Active ? 600 : 400,
+                   Active ? ctx.t.accent : Mix(ctx.t.text2, ctx.t.wz, hov),
+                   HAlign::Center, VAlign::Middle);
+    }
+
+    CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
+};
+
 } // namespace
 
 TitleBar::TitleBar() {
@@ -332,6 +359,31 @@ D2D1_SIZE_F TitleBar::Desired(float availW, float) {
     return D2D1::SizeF(W > 0 ? W : availW, H > 0 ? H : 40.f);
 }
 
+void TitleBar::SyncNav() {
+    if (nav_.size() == NavItems.size()) {
+        for (size_t i = 0; i < nav_.size(); ++i)
+            static_cast<NavChip*>(nav_[i].get())->Text = NavItems[i];
+        return;
+    }
+    // 项数变了就重建子项（按钮的 shared_ptr 一直在，重新挂上去即可）
+    nav_.clear();
+    Clear();
+    Add(min_);
+    Add(max_);
+    Add(close_);
+    for (size_t i = 0; i < NavItems.size(); ++i) {
+        auto chip = std::make_shared<NavChip>(NavItems[i]);
+        size_t idx = i;
+        chip->Clicked = [this, idx] {
+            NavIndex = (int)idx;
+            if (NavChanged) NavChanged(NavIndex);
+            if (Host) Host->Invalidate();
+        };
+        nav_.push_back(chip);
+        Add(chip);
+    }
+}
+
 void TitleBar::LayoutChildren() {
     float bh = fr_.bottom - fr_.top;
     float x = fr_.right;
@@ -346,6 +398,37 @@ void TitleBar::LayoutChildren() {
         order[i]->H = bh;
         order[i]->Arrange(D2D1_RECT_F{ x, fr_.top, x + bw, fr_.top + bh });
     }
+
+    SyncNav();
+    if (nav_.empty()) return;
+
+    // 先量宽，再决定起点（整栏跟在标题后，最小居中则整体居中）
+    std::vector<float> ws;
+    float total = 0.f;
+    for (auto& n : nav_) {
+        auto* c = static_cast<NavChip*>(n.get());
+        float w = Tw(c->Text, 13.f, 400) + 24.f;
+        ws.push_back(w);
+        total += w + NavGap;
+    }
+    total -= NavGap;
+
+    float leftBound = fr_.left + 16.f;
+    if (!Title.empty()) leftBound += Tw(Title, 12.f, 400) + 24.f;
+    float start = NavCentered ? fr_.left + ((x - fr_.left) - total) * .5f : leftBound;
+    if (start < leftBound) start = leftBound;
+
+    float chipH = 30.f;
+    float y = fr_.top + (bh - chipH) * .5f;
+    float cx = start;
+    for (size_t i = 0; i < nav_.size(); ++i) {
+        auto* c = static_cast<NavChip*>(nav_[i].get());
+        c->Active = (int(i) == NavIndex);
+        c->W = ws[i];
+        c->H = chipH;
+        c->Arrange(D2D1_RECT_F{ cx, y, cx + ws[i], y + chipH });
+        cx += ws[i] + NavGap;
+    }
 }
 
 void TitleBar::Paint(PaintCtx& ctx) {
@@ -357,7 +440,7 @@ void TitleBar::Paint(PaintCtx& ctx) {
     mb->Glyph = (Host && Host->Maximized()) ? L"\xE923" : L"\xE922";
 
     if (!Title.empty()) {
-        D2D1_RECT_F tr{ fr_.left + 16.f, fr_.top, fr_.right - (BtnWidth * 3.f + 12.f), fr_.bottom };
+        D2D1_RECT_F tr{ fr_.left + 16.f, fr_.top, fr_.right * .5f, fr_.bottom };
         ctx.g.TextTrim(tr, Title, 12.f, 400, ctx.t.text2, HAlign::Left, VAlign::Middle);
     }
 }

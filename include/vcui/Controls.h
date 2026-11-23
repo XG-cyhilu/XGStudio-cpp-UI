@@ -267,7 +267,7 @@ private:
     float aLinear = 0.f;   // 线性进度 0..1，驱动 aOpen 的 smoothstep
 };
 
-// 自绘标题栏：标题文字 + 最小化 / 最大化 / 关闭（配合 Surface::SetCustomFrame 使用）。
+// 自绘标题栏：标题文字 + 可选顶栏导航 + 最小化 / 最大化 / 关闭（配合 Surface::SetCustomFrame）。
 // 非按钮区域整体作为窗口拖动区（Caption），双击可最大化。
 class VCUI_API TitleBar : public Widget {
 public:
@@ -279,6 +279,13 @@ public:
     bool Fill = false;                        // 是否填 kp 底色；默认透明，跟页面背景融合
     std::function<bool()> OnCloseRequested;   // 返回 true 表示已自行处理（不执行默认关闭）
 
+    // 顶栏导航：整栏（跟在标题右侧）或最小居中（默认跟随内容宽度居中）
+    std::vector<std::wstring> NavItems;
+    int NavIndex = 0;
+    bool NavCentered = false;
+    float NavGap = 4.f;
+    std::function<void(int)> NavChanged;
+
     TitleBar();
 
     D2D1_SIZE_F Desired(float availW, float availH) override;
@@ -287,6 +294,8 @@ public:
 
 private:
     std::shared_ptr<Widget> min_, max_, close_;
+    std::vector<std::shared_ptr<Widget>> nav_;   // 与 NavItems 一一对应
+    void SyncNav();
 };
 
 } // namespace vcui

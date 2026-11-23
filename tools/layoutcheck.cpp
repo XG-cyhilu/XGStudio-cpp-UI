@@ -47,54 +47,54 @@ int main(int argc, char** argv) {
 
     auto root = VBox(0.f); root->Id = L"root";
 
+    // 顶栏：标题 + 导航 + 窗口按钮
     auto bar = std::make_shared<TitleBar>();
     bar->Id = L"titlebar";
-    bar->H = 40.f;
+    bar->H = 48.f;
+    bar->Title = L"Void Craft";
+    bar->NavItems = { L"启动", L"版本", L"下载", L"设置" };
     root->Add(bar);
 
     auto body = HBox(0.f); body->Id = L"body"; body->Grow = 1.f;
 
-    auto side = VBox(0.f); side->Id = L"side"; side->W = 240.f;
-    auto sideBox = VBox(0.f); sideBox->Id = L"sideBox"; sideBox->Grow = 1.f; sideBox->Pad(12.f);
-    auto folders = std::make_shared<Dropdown>(std::vector<std::wstring>{ L"a", L"b" }, 0);
-    folders->Id = L"folders";
-    sideBox->Add(folders);
-    auto list = std::make_shared<ScrollView>(); list->Id = L"list"; list->Grow = 1.f;
-    auto rows = VBox(0.f); rows->Id = L"rows";
-    for (int i = 0; i < 18; ++i) {
-        auto row = std::make_shared<ListRow>(L"1.20.4-Fabric", L"1.20.4", L"2h");
-        row->H = 56.f;
-        rows->Add(row);
+    // 左侧子导航（版本页可见）
+    auto sub = VBox(4.f); sub->Id = L"subnav"; sub->W = 220.f; sub->Pad(12.f);
+    for (int i = 0; i < 3; ++i) {
+        auto n = std::make_shared<NavItem>(L"子导航", L"\xE8F4");
+        n->Active = (i == 0);
+        sub->Add(n);
     }
-    list->Add(rows);
-    sideBox->Add(list);
-    side->Add(sideBox);
-    body->Add(side);
+    body->Add(sub);
 
-    auto mainV = VBox(0.f); mainV->Id = L"main"; mainV->Grow = 1.f;
-    auto page = VBox(12.f); page->Id = L"page"; page->Grow = 1.f; page->Pad(24.f);
+    // 内容区（平坦：无卡片，标题 + 表单行 + 日志滚动）
+    auto content = VBox(0.f); content->Id = L"content"; content->Grow = 1.f; content->Pad(28.f);
 
-    auto hero = std::make_shared<Card>(); hero->Id = L"hero"; hero->H = 180.f;
-    auto heroBox = VBox(8.f);
-    heroBox->Add(std::make_shared<Label>(L"1.20.4", 32.f, 600));
-    heroBox->Add(std::make_shared<Label>(L"Fabric 0.15.11", 14.f, 400));
-    hero->Add(heroBox);
-    page->Add(hero);
+    auto head = HBox(16.f); head->Id = L"head"; head->H = 52.f; head->Cross = Stack::Center;
+    auto ver = std::make_shared<Label>(L"1.20.4", 32.f, 600); ver->Grow = 1.f;
+    head->Add(ver);
+    auto btn = std::make_shared<Button>(L"启动游戏", true); btn->Id = L"play"; btn->W = 160.f;
+    head->Add(btn);
+    content->Add(head);
 
-    auto grid = std::make_shared<Grid>(2, 12.f); grid->Id = L"grid";
+    content->Add(std::make_shared<Divider>());
     for (int i = 0; i < 4; ++i) {
-        auto card = std::make_shared<Card>(); card->Id = L"card"; card->H = 104.f;
-        card->Add(VBox(6.f));   // 空内容
-        grid->Add(card);
+        auto row = HBox(16.f); row->Id = L"formrow"; row->H = 48.f; row->Cross = Stack::Center;
+        auto l = std::make_shared<Label>(L"Java", 14.f, 400); l->W = 180.f;
+        auto v = std::make_shared<Label>(L"17.0.9 (x64)", 14.f, 600); v->Grow = 1.f; v->Ellipsis = true;
+        row->Add(l);
+        row->Add(v);
+        content->Add(row);
+        content->Add(std::make_shared<Divider>());
     }
-    page->Add(grid);
 
-    auto logCard = std::make_shared<Card>(); logCard->Id = L"logCard"; logCard->Grow = 1.f;
-    logCard->Add(std::make_shared<Label>(L"log", 12.f, 400));
-    page->Add(logCard);
+    auto logScroll = std::make_shared<ScrollView>(); logScroll->Id = L"logscroll"; logScroll->Grow = 1.f;
+    auto logRows = VBox(2.f); logRows->Id = L"logrows";
+    for (int i = 0; i < 30; ++i)
+        logRows->Add(std::make_shared<Label>(L"[INFO] assets/objects/00/0001 正常", 12.f, 400));
+    logScroll->Add(logRows);
+    content->Add(logScroll);
 
-    mainV->Add(page);
-    body->Add(mainV);
+    body->Add(content);
     root->Add(body);
 
     D2D1_RECT_F all{ 0, 0, W, H };
