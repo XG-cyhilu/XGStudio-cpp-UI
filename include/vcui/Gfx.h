@@ -80,6 +80,9 @@ struct VCUI_API Gfx {
 
     void Text(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
               HAlign ha = HAlign::Left, VAlign va = VAlign::Top);
+    // 单行文本 + 省略号：超出宽度时截断并在尾部补「…」
+    void TextTrim(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
+                  HAlign ha = HAlign::Left, VAlign va = VAlign::Top);
     void Glyph(D2D1_RECT_F rc, const std::wstring& g, float px, D2D1_COLOR_F c,
                HAlign ha = HAlign::Center, VAlign va = VAlign::Middle);
     float TextW(const std::wstring& s, float px, int weight);

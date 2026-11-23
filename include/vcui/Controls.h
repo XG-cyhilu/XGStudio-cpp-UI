@@ -29,6 +29,7 @@ public:
     HAlign Align = HAlign::Left;
     VAlign VAlignMode = VAlign::Top;
     bool Wrap = false;
+    bool Ellipsis = false;    // 单行超宽时尾部截断加「…」
 
     Label() = default;
     explicit Label(std::wstring text, float size = 13.f, int weight = 400)
@@ -264,6 +265,28 @@ public:
 private:
     std::shared_ptr<Widget> menu_;
     float aLinear = 0.f;   // 线性进度 0..1，驱动 aOpen 的 smoothstep
+};
+
+// 自绘标题栏：标题文字 + 最小化 / 最大化 / 关闭（配合 Surface::SetCustomFrame 使用）。
+// 非按钮区域整体作为窗口拖动区（Caption），双击可最大化。
+class VCUI_API TitleBar : public Widget {
+public:
+    std::wstring Title;
+    float BtnWidth = 46.f;
+    bool ShowMinimize = true;
+    bool ShowMaximize = true;
+    bool ShowClose = true;
+    bool Fill = false;                        // 是否填 kp 底色；默认透明，跟页面背景融合
+    std::function<bool()> OnCloseRequested;   // 返回 true 表示已自行处理（不执行默认关闭）
+
+    TitleBar();
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void LayoutChildren() override;
+    void Paint(PaintCtx& ctx) override;
+
+private:
+    std::shared_ptr<Widget> min_, max_, close_;
 };
 
 } // namespace vcui

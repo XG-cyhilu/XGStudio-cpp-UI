@@ -313,6 +313,47 @@ void Gfx::Text(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1
     if (auto br = Solid(c)) rt->DrawTextLayout(D2D1::Point2F(rc.left, rc.top), lay, br);
 }
 
+void Gfx::TextTrim(D2D1_RECT_F rc, const std::wstring& s, float px, int weight, D2D1_COLOR_F c,
+                   HAlign ha, VAlign va) {
+    static int off = -1;
+    if (off < 0) off = GetEnvironmentVariableW(L"VCUI_NOTEXT", nullptr, 0) > 0 ? 1 : 0;
+    if (off) return;
+    if (!rt || s.empty() || !dwrite) return;
+    float w = rc.right - rc.left;
+    float h = rc.bottom - rc.top;
+    if (w <= 0.f || h <= 0.f) return;
+    IDWriteTextFormat* f = Fmt(px, weight, L"Microsoft YaHei", ha, va);
+    if (!f) return;
+
+    // 与 Gfx::Layout 分开缓存：裁剪版的 layout 带 trimming，
+    // 不能跟普通绘制共用同一份（否则普通 Text 也会被截断）。
+    uint64_t key = 1469598103934665603ULL;
+    for (wchar_t ch : s) key = Mix64(key, (uint64_t)ch);
+    key = Mix64(key, (uint64_t)FmtKeyOf(px, weight, L"Microsoft YaHei", ha, va));
+    key = Mix64(key, (uint64_t)(int)w);
+    key = Mix64(key, (uint64_t)(int)h);
+    key ^= 0x9E3779B97F4A7C15ULL;   // trim 标记位
+
+    IDWriteTextLayout* lay = nullptr;
+    auto it = layouts.find(key);
+    if (it != layouts.end()) {
+        lay = it->second.Get();
+    } else {
+        ComPtr<IDWriteTextLayout> made;
+        if (FAILED(dwrite->CreateTextLayout(s.c_str(), (UINT32)s.size(), f, w, h, &made)))
+            return;
+        ComPtr<IDWriteInlineObject> sign;
+        if (SUCCEEDED(dwrite->CreateEllipsisTrimmingSign(f, &sign))) {
+            DWRITE_TRIMMING tr{ DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
+            made->SetTrimming(&tr, sign.Get());
+        }
+        if (layouts.size() > 3000) layouts.clear();
+        layouts[key] = made;
+        lay = made.Get();
+    }
+    if (auto br = Solid(c)) rt->DrawTextLayout(D2D1::Point2F(rc.left, rc.top), lay, br);
+}
+
 void Gfx::Glyph(D2D1_RECT_F rc, const std::wstring& g, float px, D2D1_COLOR_F c,
                 HAlign ha, VAlign va) {
     if (!rt || g.empty()) return;

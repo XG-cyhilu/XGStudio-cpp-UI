@@ -106,6 +106,8 @@ public:
 
     virtual void OnHover(bool) {}
     virtual void OnPress() { Press = true; }
+    // 带坐标的按下回调：拖拽类控件（滚动条、滑块）靠它判断"按在哪儿"
+    virtual void OnPressAt(float /*x*/, float /*y*/) { OnPress(); }
     virtual void OnRelease(bool /*inside*/) { Press = false; }
     virtual void OnClick();
     virtual void OnClickAt(float /*x*/, float /*y*/) { OnClick(); }

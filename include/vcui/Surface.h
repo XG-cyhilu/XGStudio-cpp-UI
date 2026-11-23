@@ -30,6 +30,13 @@ public:
     bool Create(const std::wstring& title, int width, int height, bool dark = false);
     // 窗口最小尺寸（DIP），Create 之前或之后都可调用
     void SetMinSize(int w, int h) { minW_ = w; minH_ = h; }
+
+    // 无边框窗口（自绘标题栏）。必须在 Create 之前调用：
+    // 客户区吃掉整个窗口，边框缩放由库自己做命中测试，标题栏用 TitleBar + Caption。
+    void SetCustomFrame(bool on) { customFrame_ = on; }
+    bool CustomFrame() const { return customFrame_; }
+    // 边框可拖拽宽度（DIP），默认 6
+    void SetResizeBorder(float dip) { resizeBorder_ = dip < 2.f ? 2.f : dip; }
     int Run();
     void Close();
     void Minimize();
@@ -99,6 +106,8 @@ private:
     Widget* dismissOwner_ = nullptr;
     float scale_ = 1.f;
     int minW_ = 0, minH_ = 0;
+    bool customFrame_ = false;
+    float resizeBorder_ = 6.f;
     bool mouseDown_ = false;
     float downX_ = 0.f, downY_ = 0.f;
     bool dragging_ = false;

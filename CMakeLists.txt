@@ -87,6 +87,7 @@ if (VCUI_BUILD_DEMO)
 
     vcui_add_demo(VCUIDemo demo/main.cpp)        # 全控件展示
     vcui_add_demo(VCUIMinimal demo/minimal.cpp)  # 最小用法示例
+    vcui_add_demo(VCUIFrameDemo demo/frame.cpp)  # 自绘边框 + 启动器排版打样
 endif()
 
 # ---- 安装 / 导出，供 find_package(VCUI) 使用 ----

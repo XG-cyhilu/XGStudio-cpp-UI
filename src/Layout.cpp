@@ -220,6 +220,68 @@ void Divider::Paint(PaintCtx& ctx) {
     else ctx.g.Line(fr_.left, fr_.top + .5f, fr_.right, fr_.top + .5f, ctx.t.divider, 1.f);
 }
 
+// ---------------- Grid ----------------
+
+D2D1_SIZE_F Grid::Desired(float availW, float availH) {
+    int cols = Cols > 0 ? Cols : 1;
+    float aw = availW - PL - PR;
+    float cellW = cols > 1 ? (aw - GapX * float(cols - 1)) / float(cols) : aw;
+    if (cellW < 1.f) cellW = 1.f;
+
+    std::vector<float> rowH;
+    int i = 0;
+    for (auto& k : kids_) {
+        if (!k->Visible) continue;
+        D2D1_SIZE_F d = k->Desired(cellW, availH - PT - PB);
+        float kh = k->H > 0 ? k->H : d.height;
+        kh += k->MT + k->MB;
+        if (i % cols == 0) rowH.push_back(kh);
+        else rowH.back() = max(rowH.back(), kh);
+        ++i;
+    }
+    float h = PT + PB;
+    for (float v : rowH) h += v;
+    if (rowH.size() > 1) h += GapY * float(rowH.size() - 1);
+    return D2D1::SizeF(W > 0 ? W : aw + PL + PR, H > 0 ? H : h);
+}
+
+void Grid::LayoutChildren() {
+    D2D1_RECT_F in = Content();
+    int cols = Cols > 0 ? Cols : 1;
+    float aw = in.right - in.left;
+    float cellW = cols > 1 ? (aw - GapX * float(cols - 1)) / float(cols) : aw;
+    if (cellW < 1.f) cellW = 1.f;
+
+    std::vector<Widget*> vis;
+    for (auto& k : kids_)
+        if (k->Visible) vis.push_back(k.get());
+    size_t n = vis.size();
+    if (n == 0) return;
+
+    // 行高按该行最高的子项算，这样同一行的卡片底部对齐
+    std::vector<float> rowH((n + size_t(cols) - 1) / size_t(cols), 0.f);
+    for (size_t i = 0; i < n; ++i) {
+        D2D1_SIZE_F d = vis[i]->Desired(cellW, in.bottom - in.top);
+        float kh = vis[i]->H > 0 ? vis[i]->H : d.height;
+        float& rh = rowH[i / size_t(cols)];
+        rh = max(rh, kh + vis[i]->MT + vis[i]->MB);
+    }
+
+    float y = in.top;
+    for (size_t r = 0; r < rowH.size(); ++r) {
+        for (int c = 0; c < cols; ++c) {
+            size_t i = r * size_t(cols) + size_t(c);
+            if (i >= n) break;
+            Widget* k = vis[i];
+            float x = in.left + float(c) * (cellW + GapX);
+            float kh = k->H > 0 ? k->H : rowH[r] - k->MT - k->MB;
+            k->Arrange(D2D1_RECT_F{ x + k->ML, y + k->MT,
+                                    x + k->ML + cellW - k->ML - k->MR, y + k->MT + kh });
+        }
+        y += rowH[r] + GapY;
+    }
+}
+
 // ---------------- ScrollView ----------------
 
 ScrollView::ScrollView() {
@@ -232,17 +294,33 @@ D2D1_SIZE_F ScrollView::Desired(float availW, float availH) {
     return D2D1::SizeF(W > 0 ? W : availW, H > 0 ? H : availH);
 }
 
+float ScrollView::ViewHeight() const {
+    D2D1_RECT_F in = Content();
+    return in.bottom - in.top;
+}
+
+float ScrollView::ContentHeight() const {
+    if (kids_.empty()) return 0.f;
+    D2D1_RECT_F f = kids_[0]->Frame();
+    return f.bottom - f.top;
+}
+
+float ScrollView::MaxScroll() const {
+    return max(0.f, ContentHeight() - ViewHeight());
+}
+
 void ScrollView::LayoutChildren() {
     if (kids_.empty()) return;
     D2D1_RECT_F in = Content();
+    // 右侧留出滚动条沟槽，内容不会盖住滑块（也保证滑块能收到点击）
+    float gutter = ShowBar ? (BarW + 6.f) : 0.f;
     auto& content = kids_[0];
-    float ch = content->H > 0 ? content->H : content->Desired(in.right - in.left, in.bottom - in.top).height;
+    float ch = content->H > 0 ? content->H
+                              : content->Desired(in.right - in.left - gutter, in.bottom - in.top).height;
     float maxScroll = max(0.f, ch - (in.bottom - in.top));
-    if (ScrollY > maxScroll) ScrollY = maxScroll;
-    if (ScrollY < 0.f) ScrollY = 0.f;
-    if (TargetY > maxScroll) TargetY = maxScroll;
-    if (TargetY < 0.f) TargetY = 0.f;
-    content->Arrange(D2D1_RECT_F{ in.left, in.top - ScrollY, in.right, in.top - ScrollY + ch });
+    ScrollY = std::clamp(ScrollY, 0.f, maxScroll);
+    TargetY = std::clamp(TargetY, 0.f, maxScroll);
+    content->Arrange(D2D1_RECT_F{ in.left, in.top - ScrollY, in.right - gutter, in.top - ScrollY + ch });
 }
 
 bool ScrollView::Update(float dt) {
@@ -255,20 +333,87 @@ bool ScrollView::Update(float dt) {
         AnimDirty = true;
         changed = true;
     }
+    if (barHold_ > 0.f) {
+        barHold_ -= dt;
+        if (barHold_ < 0.f) barHold_ = 0.f;
+    }
+    float target = (draggingBar_ || Hover || barHold_ > 0.f) ? 1.f : 0.f;
+    if (MaxScroll() <= .5f) target = 0.f;   // 内容不足一屏就不显示
+    if (aBar != target) {
+        float k = 1.f - std::exp(-dt / .12f);
+        aBar += (target - aBar) * k;
+        if (std::abs(target - aBar) < .01f) aBar = target;
+        AnimDirty = true;
+        changed = true;
+    }
     return changed;
 }
 
 void ScrollView::OnWheel(float dy, float, float) {
     TargetY -= dy * 48.f;
+    TargetY = std::clamp(TargetY, 0.f, MaxScroll());
+    barHold_ = .9f;
+}
+
+void ScrollView::OnPressAt(float x, float y) {
+    Widget::OnPress();
+    if (!ShowBar) return;
+    D2D1_RECT_F th = ThumbRect();
+    if (x >= th.left - 2.f && x <= th.right + 2.f && y >= th.top && y < th.bottom) {
+        draggingBar_ = true;
+        grab_ = y - th.top;
+        TargetY = ScrollY;   // 按住就停掉缓动
+        barHold_ = .9f;
+    }
+}
+
+void ScrollView::OnDrag(float, float y) {
+    if (!draggingBar_) return;
+    D2D1_RECT_F tr = TrackRect();
+    D2D1_RECT_F th = ThumbRect();
+    float travel = (tr.bottom - tr.top) - (th.bottom - th.top);
+    if (travel <= 1.f) return;
+    float top = y - grab_;
+    float r = std::clamp((top - tr.top) / travel, 0.f, 1.f);
+    ScrollY = TargetY = r * MaxScroll();
+    LayoutChildren();
+    barHold_ = .9f;
+    AnimDirty = true;
+}
+
+void ScrollView::OnRelease(bool) {
+    Widget::OnRelease(true);
+    draggingBar_ = false;
+}
+
+CursorShape ScrollView::CursorAt(float, float) const { return CursorShape::Arrow; }
+
+D2D1_RECT_F ScrollView::TrackRect() const {
     D2D1_RECT_F in = Content();
-    float viewH = in.bottom - in.top;
-    float ch = kids_.empty() ? 0.f : kids_[0]->Frame().bottom - kids_[0]->Frame().top;
-    float maxScroll = max(0.f, ch - viewH);
-    TargetY = std::clamp(TargetY, 0.f, maxScroll);
+    return D2D1_RECT_F{ in.right - BarW, in.top + 2.f, in.right, in.bottom - 2.f };
+}
+
+D2D1_RECT_F ScrollView::ThumbRect() const {
+    D2D1_RECT_F tr = TrackRect();
+    float trackH = tr.bottom - tr.top;
+    float ch = ContentHeight();
+    float vh = ViewHeight();
+    float maxS = MaxScroll();
+    float w = 2.f + (BarW - 2.f) * aBar;          // 静默 2px，悬停 6px
+    float hh = ch > 0.f ? trackH * (vh / ch) : trackH;
+    hh = std::clamp(hh, 24.f, trackH);
+    float y = tr.top + (maxS > .5f ? (ScrollY / maxS) * (trackH - hh) : 0.f);
+    float x = tr.right - 2.f - w;
+    return D2D1_RECT_F{ x, y, x + w, y + hh };
 }
 
 void ScrollView::Paint(PaintCtx& ctx) {
     if (!Visible) return;
+    if (!ShowBar || aBar <= .05f || MaxScroll() <= .5f) return;
+    D2D1_RECT_F th = ThumbRect();
+    D2D1_COLOR_F c = ctx.t.text3;
+    c.a = .55f * aBar;
+    ctx.g.RoundRect(th, (th.right - th.left) * .5f, c);
 }
 
 } // namespace vcui

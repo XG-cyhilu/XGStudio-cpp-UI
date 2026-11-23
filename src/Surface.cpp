@@ -35,6 +35,22 @@ void SetCaptionDark(HWND h, bool dark) {
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 
+// 忽略 Interactive 的命中测试：判断某个点是否落在"装饰性"控件上（标题栏拖动区）。
+// Widget::Hit 会跳过非交互控件，所以自绘标题栏要单独走一遍。
+static Widget* HitAnyDecorative(Widget* w, float x, float y) {
+    if (!w || !w->Visible) return nullptr;
+    const auto& kids = w->Children();
+    for (auto it = kids.rbegin(); it != kids.rend(); ++it)
+        if (Widget* h = HitAnyDecorative(it->get(), x, y)) return h;
+    if (w->Clip) {
+        D2D1_RECT_F c = w->Content();
+        if (x < c.left || x >= c.right || y < c.top || y >= c.bottom) return nullptr;
+    }
+    D2D1_RECT_F f = w->Frame();
+    if (x >= f.left && x < f.right && y >= f.top && y < f.bottom) return w;
+    return nullptr;
+}
+
 } // namespace
 
 Surface::Surface() = default;
@@ -66,8 +82,13 @@ bool Surface::Create(const std::wstring& title, int width, int height, bool dark
     scale_ = (float)dpi / 96.f;
 
     RECT rc{ 0, 0, (LONG)(width * scale_), (LONG)(height * scale_) };
-    DWORD style = WS_OVERLAPPEDWINDOW;
-    AdjustWindowRectEx(&rc, style, FALSE, 0);
+    // 自绘边框：保留 WS_CAPTION + WS_THICKFRAME 让 DWM 继续给投影/吸附/最大化动画，
+    // 但用 WM_NCCALCSIZE 把非客户区吃掉，标题栏改由 TitleBar 控件画。
+    DWORD style = customFrame_
+        ? (WS_POPUP | WS_THICKFRAME | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)
+        : WS_OVERLAPPEDWINDOW;
+    // 自绘边框时客户区＝整窗，不能再按非客户区把窗口撑大，否则内容比请求的尺寸大一圈
+    if (!customFrame_) AdjustWindowRectEx(&rc, style, FALSE, 0);
 
     hwnd_ = CreateWindowExW(0, kClass, title.c_str(), style, CW_USEDEFAULT, CW_USEDEFAULT,
                             rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, inst, this);
@@ -413,6 +434,29 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
 
+    case WM_NCCALCSIZE:
+        // 自绘边框：客户区＝整窗。最大化时把客户区对齐到显示器工作区，
+        // 否则 WS_THICKFRAME 会把窗口顶出屏幕 8px。
+        if (customFrame_ && wp) {
+            NCCALCSIZE_PARAMS* p = reinterpret_cast<NCCALCSIZE_PARAMS*>(lp);
+            if (IsZoomed(hwnd_)) {
+                MONITORINFO mi{};
+                mi.cbSize = sizeof(mi);
+                if (GetMonitorInfoW(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST), &mi))
+                    p->rgrc[0] = mi.rcWork;
+            }
+            return 0;
+        }
+        break;
+
+    case WM_NCPAINT:
+        if (customFrame_) return 0;   // 没有非客户区可画
+        break;
+
+    case WM_NCACTIVATE:
+        if (customFrame_) return TRUE;   // 别让系统重画标题栏
+        break;
+
     case WM_GETMINMAXINFO: {
         MINMAXINFO* mi = reinterpret_cast<MINMAXINFO*>(lp);
         uint32_t dpi = GetDpiForWindow(hwnd_);
@@ -425,14 +469,35 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
     }
 
     case WM_NCHITTEST: {
-        LRESULT r = DefWindowProcW(hwnd_, msg, wp, lp);
-        if (r != HTCLIENT) return r;
         POINT pt{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
         ScreenToClient(hwnd_, &pt);
         float x = (float)pt.x / scale_, y = (float)pt.y / scale_;
+
+        // 自绘边框：先判边缘缩放（最大化时没有可拖的边）
+        if (customFrame_ && !IsZoomed(hwnd_)) {
+            RECT wr{};
+            GetWindowRect(hwnd_, &wr);
+            float b = resizeBorder_ * scale_;
+            bool L = pt.x < wr.left + (LONG)b, R = pt.x >= wr.right - (LONG)b;
+            bool T = pt.y < wr.top + (LONG)b, B = pt.y >= wr.bottom - (LONG)b;
+            if (T && L) return HTTOPLEFT;
+            if (T && R) return HTTOPRIGHT;
+            if (B && L) return HTBOTTOMLEFT;
+            if (B && R) return HTBOTTOMRIGHT;
+            if (L) return HTLEFT;
+            if (R) return HTRIGHT;
+            if (T) return HTTOP;
+            if (B) return HTBOTTOM;
+        }
+
+        LRESULT r = DefWindowProcW(hwnd_, msg, wp, lp);
+        if (r != HTCLIENT) return r;
+
+        // 落在 Caption 子树上的非交互区域 → 交给系统做窗口拖动/双击最大化
         Widget* w = root_ ? root_->Hit(x, y) : nullptr;
-        if (w && !w->Interactive) {
-            for (Widget* p = w; p; p = p->Parent)
+        if (!w || !w->Interactive) {
+            Widget* any = root_ ? HitAnyDecorative(root_.get(), x, y) : nullptr;
+            for (Widget* p = any; p; p = p->Parent)
                 if (p->Caption) return HTCAPTION;
         }
         return HTCLIENT;
@@ -488,7 +553,7 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         if (w) {
             if (w->Focusable()) SetFocus(w);
             else SetFocus(nullptr);
-            w->OnPress();
+            w->OnPressAt(x, y);
         } else {
             SetFocus(nullptr);
         }

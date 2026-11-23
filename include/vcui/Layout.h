@@ -74,18 +74,53 @@ public:
     void Paint(PaintCtx& ctx) override;
 };
 
-// 纵向滚动容器：单子项，内容高超过视口时可滚（带缓动）。
+// 等宽网格：按 Cols 列排布，行高取该行最高的子项。
+class VCUI_API Grid : public Widget {
+public:
+    int Cols = 2;
+    float GapX = 12.f;
+    float GapY = 12.f;
+
+    Grid() = default;
+    explicit Grid(int cols, float gap = 12.f) : Cols(cols > 0 ? cols : 1), GapX(gap), GapY(gap) {}
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void LayoutChildren() override;
+};
+
+// 纵向滚动容器：单子项，内容高超过视口时可滚（带缓动与自绘滚动条）。
 class VCUI_API ScrollView : public Widget {
 public:
     float ScrollY = 0.f;
     float TargetY = 0.f;
+    bool ShowBar = true;      // 自绘滚动条（静默细线，悬停/滚动时变粗）
+    float BarW = 6.f;         // 滚动条最大宽度（DIP）
+
     ScrollView();
     D2D1_SIZE_F Desired(float availW, float availH) override;
     void LayoutChildren() override;
     bool Update(float dt) override;
     bool WantsWheel() const override { return true; }
     void OnWheel(float dy, float x, float y) override;
+    void OnPressAt(float x, float y) override;
+    void OnDrag(float x, float y) override;
+    void OnRelease(bool inside) override;
+    CursorShape CursorAt(float x, float y) const override;
     void Paint(PaintCtx& ctx) override;
+
+    // 内容区高度 / 视口高度 / 可滚动范围（供外部做进度指示）
+    float ContentHeight() const;
+    float ViewHeight() const;
+
+private:
+    D2D1_RECT_F ThumbRect() const;
+    D2D1_RECT_F TrackRect() const;
+    float MaxScroll() const;
+
+    bool draggingBar_ = false;
+    float grab_ = 0.f;        // 抓手相对滑块顶部的偏移
+    float aBar = 0.f;         // 滚动条显现权重 0..1
+    float barHold_ = 0.f;     // 滚动静默期（秒），期间保持显示
 };
 
 } // namespace vcui

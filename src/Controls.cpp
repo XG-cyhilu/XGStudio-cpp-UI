@@ -35,7 +35,11 @@ D2D1_SIZE_F Label::Desired(float availW, float availH) {
 void Label::Paint(PaintCtx& ctx) {
     if (!Visible || Text.empty()) return;
     D2D1_COLOR_F col = Color.a > 0.f ? Color : ctx.t.wz;
-    ctx.g.Text(fr_, Text, Size, Weight, col, Align, VAlignMode);
+    if (Ellipsis) {
+        ctx.g.TextTrim(fr_, Text, Size, Weight, col, Align, VAlignMode);
+    } else {
+        ctx.g.Text(fr_, Text, Size, Weight, col, Align, VAlignMode);
+    }
 }
 
 // ---------------- Button ----------------

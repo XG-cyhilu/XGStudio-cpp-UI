@@ -266,4 +266,100 @@ void Dropdown::CloseMenu() {
     // 菜单等淡出动画结束再销毁（见 Update）
 }
 
+// ---------------- TitleBar ----------------
+
+namespace {
+
+// 标题栏按钮：无边框、悬停亮底；关闭按钮悬停变红（Win11 风格）。
+class TitleButton : public Widget {
+public:
+    std::wstring Glyph;
+    bool Danger = false;
+
+    explicit TitleButton(std::wstring g, bool danger = false)
+        : Glyph(std::move(g)), Danger(danger) {
+        W = 46.f;
+        H = 40.f;
+        Interactive = true;
+    }
+
+    D2D1_SIZE_F Desired(float, float) override {
+        return D2D1::SizeF(W > 0 ? W : 46.f, H > 0 ? H : 40.f);
+    }
+
+    void Paint(PaintCtx& ctx) override {
+        float hov = HoverA(), prs = PressA();
+        if (Danger) {
+            if (hov > .01f) {
+                D2D1_COLOR_F red = Mix(Hex(0xC42B1C), Hex(0xB0281A), prs);
+                red.a = hov;
+                ctx.g.FillRect(fr_, red);
+            }
+            ctx.g.Glyph(fr_, Glyph, 10.f, Mix(ctx.t.text2, Hex(0xFFFFFF), hov));
+        } else {
+            if (hov > .01f) ctx.g.FillRect(fr_, A(CtrlHover(ctx.t), hov));
+            ctx.g.Glyph(fr_, Glyph, 10.f, Mix(ctx.t.text2, ctx.t.wz, hov));
+        }
+    }
+
+    CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
+};
+
+} // namespace
+
+TitleBar::TitleBar() {
+    H = 40.f;
+    Caption = true;        // 非按钮区域整条都是窗口拖动区
+    Interactive = false;   // 让点击冒泡到 Caption 判定
+
+    min_ = std::make_shared<TitleButton>(L"\xE921");                 // ChromeMinimize
+    max_ = std::make_shared<TitleButton>(L"\xE922");                 // ChromeMaximize
+    close_ = std::make_shared<TitleButton>(L"\xE8BB", true);         // ChromeClose
+
+    min_->Clicked = [this] { if (Host) Host->Minimize(); };
+    max_->Clicked = [this] { if (Host) Host->ToggleMaximize(); };
+    close_->Clicked = [this] {
+        if (OnCloseRequested && OnCloseRequested()) return;
+        if (Host) Host->Close();
+    };
+
+    Add(min_);
+    Add(max_);
+    Add(close_);
+}
+
+D2D1_SIZE_F TitleBar::Desired(float availW, float) {
+    return D2D1::SizeF(W > 0 ? W : availW, H > 0 ? H : 40.f);
+}
+
+void TitleBar::LayoutChildren() {
+    float bh = fr_.bottom - fr_.top;
+    float x = fr_.right;
+    Widget* order[] = { close_.get(), max_.get(), min_.get() };
+    bool shown[] = { ShowClose, ShowMaximize, ShowMinimize };
+    for (int i = 0; i < 3; ++i) {
+        order[i]->Visible = shown[i];
+        if (!shown[i]) continue;
+        float bw = BtnWidth > 0 ? BtnWidth : 46.f;
+        x -= bw;
+        order[i]->W = bw;
+        order[i]->H = bh;
+        order[i]->Arrange(D2D1_RECT_F{ x, fr_.top, x + bw, fr_.top + bh });
+    }
+}
+
+void TitleBar::Paint(PaintCtx& ctx) {
+    if (!Visible) return;
+    if (Fill) ctx.g.FillRect(fr_, ctx.t.kp);
+
+    // 最大化/还原图标跟随窗口状态
+    TitleButton* mb = static_cast<TitleButton*>(max_.get());
+    mb->Glyph = (Host && Host->Maximized()) ? L"\xE923" : L"\xE922";
+
+    if (!Title.empty()) {
+        D2D1_RECT_F tr{ fr_.left + 16.f, fr_.top, fr_.right - (BtnWidth * 3.f + 12.f), fr_.bottom };
+        ctx.g.TextTrim(tr, Title, 12.f, 400, ctx.t.text2, HAlign::Left, VAlign::Middle);
+    }
+}
+
 } // namespace vcui

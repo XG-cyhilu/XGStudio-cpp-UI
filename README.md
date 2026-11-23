@@ -113,7 +113,8 @@ XGStudio-cpp-UI/
 ├─ src/                   实现（不对外）
 ├─ demo/
 │  ├─ main.cpp            全控件展示
-│  └─ minimal.cpp         最小用法示例
+│  ├─ minimal.cpp         最小用法示例
+│  └─ frame.cpp           自绘边框 + 启动器排版打样（TitleBar/Grid/滚动条/省略号）
 └─ CMakeLists.txt
 ```
 
@@ -189,6 +190,9 @@ vcpkg install vcui --overlay-ports=path/to/port
 | API | 说明 |
 |---|---|
 | `Create(title, w, h, dark)` | 建窗，客户区 `w × h`（DIP） |
+| `SetCustomFrame(on)` | 自绘边框窗口（客户区吃掉整窗，边框缩放/拖动由库处理）；须在 `Create` 之前调用 |
+| `CustomFrame()` | 当前是否自绘边框 |
+| `SetResizeBorder(dip)` | 边框可拖拽宽度，默认 6 |
 | `SetRoot(widget)` | 设置控件树根 |
 | `Run()` | 进入消息循环，退出时返回 |
 | `SetMinSize(w, h)` | 窗口最小尺寸，默认 320×200 |
@@ -216,7 +220,8 @@ vcpkg install vcui --overlay-ports=path/to/port
 | `VBox(gap)` / `HBox(gap)` | 一维栈；`Cross` 控制交叉轴 `Start/Center/End/Stretch`（默认 Stretch） |
 | `Card` | 底色 + 圆角 + 描边 + 阴影，`Shadow/Border/Radius/Fill` 可关 |
 | `Absolute` | 子项用 `X/Y/W/H` 绝对定位 |
-| `ScrollView` | 单子项纵向滚动，滚轮带缓动（`ScrollY/TargetY`） |
+| `Grid(cols, gap)` | 等宽网格，行高取该行最高的子项（信息卡、磁贴布局） |
+| `ScrollView` | 单子项纵向滚动，滚轮带缓动，**自带自绘滚动条**（静默 2px，悬停/滚动时变粗，可拖拽） |
 | `Spacer(size)` / `Divider()` | 留白 / 1px 分隔线 |
 
 ## 主题与 Token
@@ -260,7 +265,7 @@ Token 命名沿用拼音缩写（历史原因），对照如下。表中前四�
 
 | 控件 | 关键字段 / 回调 |
 |---|---|
-| `Label` | `Text`、`Size`、`Weight`、`Color`、`Align`、`VAlignMode`、`Wrap` |
+| `Label` | `Text`、`Size`、`Weight`、`Color`、`Align`、`VAlignMode`、`Wrap`、`Ellipsis`（超宽尾截断加「…」） |
 | `Button` | `Text`、`Glyph`(Segoe MDL2)、`Primary`、`MinWidth`、`Clicked` |
 | `Checkbox` | `On`、`Text`、`Changed(bool)` |
 | `Switch` | `On`、`Changed(bool)` |
@@ -273,6 +278,29 @@ Token 命名沿用拼音缩写（历史原因），对照如下。表中前四�
 | `ListRow` | `Title`、`Sub`、`Right`、`Selected`、`Clicked` |
 | `IconButton` | `Glyph`、`GlyphSize`、`Ghost`、`Clicked` |
 | `Dropdown` | `Items`、`Selected`、`MenuWidth`、`Changed(int)` |
+| `TitleBar` | `Title`、`BtnWidth`、`ShowMinimize/Maximize/Close`、`Fill`、`OnCloseRequested`；非按钮区整条作为拖动区，双击可最大化 |
+
+### 自绘边框窗口（TitleBar）
+
+```cpp
+Surface app;
+app.SetMinSize(980, 620);
+app.SetCustomFrame(true);               // 客户区吃掉整窗，系统标题栏消失
+app.Create(L"我的应用", 1180, 740);
+
+auto root = std::make_shared<Widget>();
+auto bar = std::make_shared<TitleBar>();
+bar->Title = L"我的应用";
+bar->Fill = true;
+root->Add(bar);                          // 高 40，右上角三个系统按钮
+
+auto body = HBox(0.f);
+body->Grow = 1.f;                        // 占满标题栏以下
+root->Add(body);
+app.SetRoot(root);
+```
+
+保留 `WS_CAPTION | WS_THICKFRAME` 让 DWM 继续提供投影、吸附与最大化动画，再用 `WM_NCCALCSIZE` 吃掉非客户区；边缘缩放由库自己做命中测试（`SetResizeBorder` 调宽度），拖动靠 `TitleBar::Caption`。最大化图标会在 `TitleBar::Paint` 里跟随窗口状态切换。
 
 ### 输入法（自绘文本框最难的一块）
 
@@ -332,7 +360,7 @@ public:
 
 ## 已知未做
 
-- 滚动无惯性余速、无滚动条
+- 滚动无惯性余速（滚动条本身已自绘，支持悬停显形与拖拽）
 - 下拉只向下展开，不自动翻转
 - 滑块无键盘步进
 - 阴影是 4 层圆角位图叠加，不是真高斯
