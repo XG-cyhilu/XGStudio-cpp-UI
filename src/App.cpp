@@ -15,12 +15,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // 一键起窗口：把"Surface + 自绘边框 + 标题栏 + 内容区"这套固定骨架收成一个入口。
+// 入口名是 CreateAppWindow 而不是 CreateWindow：后者被 windows.h 定义成宏了。
 
 #include "vcui/App.h"
 
 namespace vcui {
 
-int RunApp(const AppOptions& opt) {
+int CreateAppWindow(const AppOptions& opt) {
     // DPI 感知必须在任何窗口创建之前设置；重复调用无副作用
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
@@ -59,13 +60,14 @@ int RunApp(const AppOptions& opt) {
     return app.Run();
 }
 
-int RunApp(std::wstring title, int width, int height, std::function<void(Widget& body)> build) {
+int CreateAppWindow(std::wstring title, int width, int height,
+                    std::function<void(Widget& body)> build) {
     AppOptions o;
     o.Title = std::move(title);
     o.Width = width;
     o.Height = height;
     o.Build = std::move(build);
-    return RunApp(o);
+    return CreateAppWindow(o);
 }
 
 } // namespace vcui

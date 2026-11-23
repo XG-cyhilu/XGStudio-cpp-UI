@@ -192,7 +192,7 @@ vcpkg install vcui --overlay-ports=path/to/port
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     // 纯空白窗口
-    return vcui::RunApp(L"我的应用", 960, 640);
+    return vcui::CreateAppWindow(L"我的应用", 960, 640);
 }
 ```
 
@@ -200,7 +200,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
 ```cpp
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-    return vcui::RunApp(L"我的应用", 960, 640, [](vcui::Widget& body) {
+    return vcui::CreateAppWindow(L"我的应用", 960, 640, [](vcui::Widget& body) {
         auto page = vcui::VBox(14.f);
         page->Pad(24.f);
         page->Add(std::make_shared<vcui::Label>(L"Hello", 20.f, 600));
@@ -224,10 +224,10 @@ o.Accent = vcui::Hex(0x7C4DFF);
 o.TitleBar = false;            // 不要库的标题栏，自己做
 o.BodyPad = 20.f;
 o.Build = [](vcui::Widget& body) { /* … */ };
-return vcui::RunApp(o);
+return vcui::CreateAppWindow(o);
 ```
 
-`RunApp` 内部就是：`Surface` → `SetMinSize` / `SetCustomFrame` → `Create` → `Theme::Set` / `SetAccent` → `TitleBar` + 内容 `VBox` → `Run()`。想自己掌控生命周期（多窗口、先建窗再异步灌内容）就继续直接用 `Surface`，两条路径完全等价。
+`CreateAppWindow` 内部就是：`Surface` → `SetMinSize` / `SetCustomFrame` → `Create` → `Theme::Set` / `SetAccent` → `TitleBar` + 内容 `VBox` → `Run()`。想自己掌控生命周期（多窗口、先建窗再异步灌内容）就继续直接用 `Surface`，两条路径完全等价。
 
 ## 核心概念
 
@@ -252,7 +252,7 @@ return vcui::RunApp(o);
 | `KickAnim()` | 唤醒动画帧循环 |
 | `ClientSize()` | 客户区尺寸（DIP），覆盖层定位用 |
 | `ShowInfoBar` / `CloseInfoBars` / `SetInfoBarWidth` | 右上角提示条 |
-| `RunApp(AppOptions)` | 一键建窗 + 标题栏 + 内容区 + 消息循环（见「快速开始」） |
+| `CreateAppWindow(AppOptions)` | 一键建窗 + 标题栏 + 内容区 + 消息循环（见「快速开始」） |
 
 ### Widget
 

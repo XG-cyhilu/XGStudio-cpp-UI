@@ -43,11 +43,13 @@ struct AppOptions {
 };
 
 // 创建窗口、跑消息循环，退出时返回进程退出码。阻塞直到窗口关闭。
-// 典型用法：return RunApp({ .Title = L"我的应用", .Width = 900 });
-VCUI_API int RunApp(const AppOptions& opt);
+// 典型用法：return CreateAppWindow({ .Title = L"我的应用", .Width = 900 });
+//
+// 名字没叫 CreateWindow：<windows.h> 把它 #define 成了 CreateWindowW，会撞名。
+VCUI_API int CreateAppWindow(const AppOptions& opt);
 
 // 最简重载：标题 + 尺寸（可选内容搭建）。不传 Build 就是纯空白窗口。
-VCUI_API int RunApp(std::wstring title, int width = 960, int height = 640,
-                    std::function<void(Widget& body)> build = nullptr);
+VCUI_API int CreateAppWindow(std::wstring title, int width = 960, int height = 640,
+                             std::function<void(Widget& body)> build = nullptr);
 
 } // namespace vcui

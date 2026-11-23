@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// 最小示例：RunApp 一行起窗口（DPI、自绘边框、标题栏都由库包好），
+// 最小示例：CreateAppWindow 一行起窗口（DPI、自绘边框、标题栏都由库包好），
 // 回调里拿到的 body 就是标题栏下面的内容区。
 #include <windows.h>
 #include "vcui/vcui.h"
@@ -47,6 +47,6 @@ static void BuildPage(Widget& body) {
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     // 只要窗口、不要内容时，连回调都可以省：
-    //     return RunApp(L"空白窗口", 720, 480);
-    return RunApp(L"XGStudio-cpp-UI — Minimal", 520, 340, BuildPage);
+    //     return CreateAppWindow(L"空白窗口", 720, 480);
+    return CreateAppWindow(L"XGStudio-cpp-UI — Minimal", 520, 340, BuildPage);
 }
