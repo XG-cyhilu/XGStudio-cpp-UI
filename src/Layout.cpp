@@ -37,6 +37,8 @@ D2D1_SIZE_F Stack::Desired(float availW, float availH) {
         D2D1_SIZE_F d = k->Desired(aw, ah);
         float cw = k->W > 0 ? k->W : d.width;
         float ch = k->H > 0 ? k->H : d.height;
+        // Grow 子项在布局阶段才决定实际高度（只吃剩余空间），但 Desired 仍按固有
+        // 尺寸参与，容器才不会被算成"迷你高度"而让整页塌陷。
         float b = k->Basis >= 0 ? k->Basis : (Direction == Col ? ch : cw);
         mainSum += b + (Direction == Col ? k->MT + k->MB : k->ML + k->MR);
         crossMax = max(crossMax, (Direction == Col ? cw + k->ML + k->MR : ch + k->MT + k->MB));
@@ -62,34 +64,37 @@ void Stack::LayoutChildren() {
 
 void Stack::LayoutCol(D2D1_RECT_F in) {
     float avail = in.bottom - in.top;
-    float used = 0.f, growTotal = 0.f;
+    float usedFixed = 0.f, growTotal = 0.f;
     int n = 0;
     float aw = in.right - in.left;
 
     std::vector<float> bases, widths;
     bases.reserve(kids_.size());
+    widths.reserve(kids_.size());
     for (auto& k : kids_) {
         if (!k->Visible) { bases.push_back(0.f); widths.push_back(0.f); continue; }
         D2D1_SIZE_F d = k->Desired(aw, avail);
         float cw = k->W > 0 ? k->W : (Cross == Stretch ? aw - k->ML - k->MR : d.width);
         float ch = k->H > 0 ? k->H : d.height;
-        float b = k->Basis >= 0 ? k->Basis : ch;
+        float b = k->Basis >= 0 ? k->Basis : (k->Grow > 0.f ? 0.f : ch);
         bases.push_back(b);
         widths.push_back(cw);
-        used += b + k->MT + k->MB;
+        usedFixed += b + k->MT + k->MB;
         growTotal += k->Grow;
         ++n;
     }
-    if (n > 1) used += Gap * float(n - 1);
+    if (n > 1) usedFixed += Gap * float(n - 1);
 
-    float freeSpace = max(0.f, avail - used);
+    // Grow 子项只分"非 Grow 兄弟排完之后剩下的空间"，否则它会按固有高度占满，
+    // 把排在它后面的兄弟顶出容器（表现在滚动容器覆盖其它 flex 区域）。
+    float freeSpace = max(0.f, avail - usedFixed);
     float y = in.top;
 
     for (size_t i = 0; i < kids_.size(); ++i) {
         auto& k = kids_[i];
         if (!k->Visible) continue;
         float h = bases[i];
-        if (growTotal > 0.f && k->Grow > 0.f) h += freeSpace * (k->Grow / growTotal);
+        if (growTotal > 0.f && k->Grow > 0.f) h = freeSpace * (k->Grow / growTotal);
 
         float cw = widths[i];
         float ox = 0.f;
@@ -106,34 +111,35 @@ void Stack::LayoutCol(D2D1_RECT_F in) {
 
 void Stack::LayoutRow(D2D1_RECT_F in) {
     float avail = in.right - in.left;
-    float used = 0.f, growTotal = 0.f;
+    float usedFixed = 0.f, growTotal = 0.f;
     int n = 0;
     float ah = in.bottom - in.top;
 
     std::vector<float> bases, heights;
     bases.reserve(kids_.size());
+    heights.reserve(kids_.size());
     for (auto& k : kids_) {
         if (!k->Visible) { bases.push_back(0.f); heights.push_back(0.f); continue; }
         D2D1_SIZE_F d = k->Desired(avail, ah);
         float cw = k->W > 0 ? k->W : d.width;
         float ch = k->H > 0 ? k->H : (Cross == Stretch ? ah - k->MT - k->MB : d.height);
-        float b = k->Basis >= 0 ? k->Basis : cw;
+        float b = k->Basis >= 0 ? k->Basis : (k->Grow > 0.f ? 0.f : cw);
         bases.push_back(b);
         heights.push_back(ch);
-        used += b + k->ML + k->MR;
+        usedFixed += b + k->ML + k->MR;
         growTotal += k->Grow;
         ++n;
     }
-    if (n > 1) used += Gap * float(n - 1);
+    if (n > 1) usedFixed += Gap * float(n - 1);
 
-    float freeSpace = max(0.f, avail - used);
+    float freeSpace = max(0.f, avail - usedFixed);
     float x = in.left;
 
     for (size_t i = 0; i < kids_.size(); ++i) {
         auto& k = kids_[i];
         if (!k->Visible) continue;
         float w = bases[i];
-        if (growTotal > 0.f && k->Grow > 0.f) w += freeSpace * (k->Grow / growTotal);
+        if (growTotal > 0.f && k->Grow > 0.f) w = freeSpace * (k->Grow / growTotal);
 
         float ch = heights[i];
         float oy = 0.f;

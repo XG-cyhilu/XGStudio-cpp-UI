@@ -98,6 +98,11 @@ bool Widget::HitTest(float x, float y) const {
 
 Widget* Widget::Hit(float x, float y) {
     if (!Visible) return nullptr;
+    // 先按自身裁剪判定：被滚出视口的子项虽然在 fr_ 上还"存在"，但不该再响应点击
+    if (Clip) {
+        D2D1_RECT_F c = Content();
+        if (x < c.left || x >= c.right || y < c.top || y >= c.bottom) return nullptr;
+    }
     for (auto it = kids_.rbegin(); it != kids_.rend(); ++it) {
         if (Widget* h = (*it)->Hit(x, y)) {
             // 命中纯装饰子节点（文字、图标）时上溯到真正的控件，
@@ -105,10 +110,6 @@ Widget* Widget::Hit(float x, float y) {
             while (h && !h->Interactive) h = h->Parent;
             return h;
         }
-    }
-    if (Clip) {
-        D2D1_RECT_F c = Content();
-        if (x < c.left || x >= c.right || y < c.top || y >= c.bottom) return nullptr;
     }
     return HitTest(x, y) && Enabled && Interactive ? this : nullptr;
 }
