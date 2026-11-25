@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -127,21 +127,23 @@ Metrics GetMetrics() {
     return m;
 }
 
+// 微软雅黑没有真正的 Semibold 字面，600 会被 DirectWrite 当成 700 处理（发虚发粗），
+// 所以整套 ramp 统一走 400：层级靠字号和颜色区分，不再靠字重。
 namespace Type {
 const TypeStyle Caption2        { 10.f, 14.f, 400, L"Caption 2" };
-const TypeStyle Caption2Strong  { 10.f, 14.f, 600, L"Caption 2 Strong" };
+const TypeStyle Caption2Strong  { 10.f, 14.f, 400, L"Caption 2 Strong" };
 const TypeStyle Caption1        { 12.f, 16.f, 400, L"Caption 1" };
-const TypeStyle Caption1Strong  { 12.f, 16.f, 600, L"Caption 1 Strong" };
-const TypeStyle Caption1Stronger{ 12.f, 16.f, 700, L"Caption 1 Stronger" };
+const TypeStyle Caption1Strong  { 12.f, 16.f, 400, L"Caption 1 Strong" };
+const TypeStyle Caption1Stronger{ 12.f, 16.f, 400, L"Caption 1 Stronger" };
 const TypeStyle Body1           { 14.f, 20.f, 400, L"Body 1" };
-const TypeStyle Body1Strong     { 14.f, 20.f, 600, L"Body 1 Strong" };
-const TypeStyle Subtitle2       { 16.f, 22.f, 600, L"Subtitle 2" };
-const TypeStyle Subtitle1       { 20.f, 26.f, 600, L"Subtitle 1" };
-const TypeStyle Title3          { 24.f, 32.f, 600, L"Title 3" };
-const TypeStyle Title2          { 28.f, 36.f, 600, L"Title 2" };
-const TypeStyle Title1          { 32.f, 40.f, 600, L"Title 1" };
-const TypeStyle LargeTitle      { 40.f, 52.f, 600, L"Large Title" };
-const TypeStyle Display         { 68.f, 92.f, 600, L"Display" };
+const TypeStyle Body1Strong     { 14.f, 20.f, 400, L"Body 1 Strong" };
+const TypeStyle Subtitle2       { 16.f, 22.f, 400, L"Subtitle 2" };
+const TypeStyle Subtitle1       { 20.f, 26.f, 400, L"Subtitle 1" };
+const TypeStyle Title3          { 24.f, 32.f, 400, L"Title 3" };
+const TypeStyle Title2          { 28.f, 36.f, 400, L"Title 2" };
+const TypeStyle Title1          { 32.f, 40.f, 400, L"Title 1" };
+const TypeStyle LargeTitle      { 40.f, 52.f, 400, L"Large Title" };
+const TypeStyle Display         { 68.f, 92.f, 400, L"Display" };
 }
 
 TypeStyle TypeFor(float px) {
