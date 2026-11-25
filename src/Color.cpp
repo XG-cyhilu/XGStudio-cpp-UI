@@ -16,9 +16,79 @@
 
 #include "vcui/Color.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cwchar>
 
 namespace vcui {
+
+bool ParseHex(const std::wstring& s, D2D1_COLOR_F& out) {
+    int digit = 0;
+    unsigned v[6] = {};
+    for (size_t i = 0; i < s.size(); ++i) {
+        wchar_t c = s[i];
+        if (c == L'#' && i == 0) continue;
+        unsigned d;
+        if (c >= L'0' && c <= L'9') d = (unsigned)(c - L'0');
+        else if (c >= L'a' && c <= L'f') d = (unsigned)(c - L'a') + 10;
+        else if (c >= L'A' && c <= L'F') d = (unsigned)(c - L'A') + 10;
+        else return false;
+        if (digit >= 6) return false;
+        v[digit++] = d;
+    }
+    if (digit != 3 && digit != 6) return false;
+    if (digit == 3) {   // #RGB → 每位复制一次
+        for (int i = 0; i < 3; ++i) v[i] = v[i] * 17;
+        out = Hex((v[0] << 16) | (v[1] << 8) | v[2]);
+        return true;
+    }
+    out = Hex((v[0] << 20) | (v[1] << 16) | (v[2] << 12) | (v[3] << 8) | (v[4] << 4) | v[5]);
+    return true;
+}
+
+std::wstring ToHex(D2D1_COLOR_F c) {
+    auto clampByte = [](float f) {
+        int v = (int)(f * 255.f + .5f);
+        return v < 0 ? 0 : (v > 255 ? 255 : v);
+    };
+    wchar_t buf[8];
+    std::swprintf(buf, 8, L"#%02X%02X%02X", clampByte(c.r), clampByte(c.g), clampByte(c.b));
+    return buf;
+}
+
+void RgbToHsv(D2D1_COLOR_F c, float& h, float& s, float& v) {
+    float mx = (std::max)(c.r, (std::max)(c.g, c.b));
+    float mn = (std::min)(c.r, (std::min)(c.g, c.b));
+    float d = mx - mn;
+    v = mx;
+    s = mx <= 0.f ? 0.f : d / mx;
+    if (d <= 0.f) return;                      // 灰色：色相保持调用方传入的旧值
+    float hue;
+    if (mx == c.r) hue = (c.g - c.b) / d;
+    else if (mx == c.g) hue = 2.f + (c.b - c.r) / d;
+    else hue = 4.f + (c.r - c.g) / d;
+    hue *= 60.f;
+    if (hue < 0.f) hue += 360.f;
+    h = hue;
+}
+
+D2D1_COLOR_F HsvToRgb(float h, float s, float v) {
+    h = std::fmod(h, 360.f);
+    if (h < 0.f) h += 360.f;
+    s = (std::max)(0.f, (std::min)(1.f, s));
+    v = (std::max)(0.f, (std::min)(1.f, v));
+    float c = v * s;
+    float x = c * (1.f - std::fabs(std::fmod(h / 60.f, 2.f) - 1.f));
+    float m = v - c;
+    float r = 0, g = 0, b = 0;
+    if (h < 60.f)       { r = c; g = x; }
+    else if (h < 120.f) { r = x; g = c; }
+    else if (h < 180.f) { g = c; b = x; }
+    else if (h < 240.f) { g = x; b = c; }
+    else if (h < 300.f) { r = x; b = c; }
+    else                { r = c; b = x; }
+    return C(r + m, g + m, b + m);
+}
 
 Tokens GetTokens(Palette p, bool dark) {
     Tokens t;

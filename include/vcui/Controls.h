@@ -296,6 +296,46 @@ private:
     void SyncMenuSelection();
 };
 
+// 颜色选取器：饱和度/明度方块 + 色相条 + 十六进制输入 + 可选预设色板。
+// 直接在页面上内嵌使用（不弹出），高度约 200；拖动方块或色相条实时回调 Changed。
+class VCUI_API ColorPicker : public Widget {
+public:
+    D2D1_COLOR_F Color = Hex(0x0071EA);
+    float SquareH = 150.f;      // 饱和度/明度方块高度
+    float HueH = 14.f;          // 色相条高度
+    float Spacing = 8.f;        // 各段间距
+    bool ShowHex = true;        // 底部一行：当前色块 + #RRGGBB 输入
+    std::vector<unsigned> Swatches;   // 预设色板（0xRRGGBB），非空时底部多一行圆点
+
+    ColorPicker();
+    explicit ColorPicker(D2D1_COLOR_F c);
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void LayoutChildren() override;
+    void Paint(PaintCtx& ctx) override;
+    void OnPressAt(float x, float y) override;
+    void OnDrag(float x, float y) override;
+    void OnRelease(bool inside) override;
+    CursorShape CursorAt(float, float) const override { return CursorShape::Hand; }
+
+    // 外部改色（不触发 Changed）；notify 为真时回调
+    void SetColor(D2D1_COLOR_F c, bool notify = false);
+    std::function<void(D2D1_COLOR_F)> Changed;
+
+private:
+    float hue_ = 210.f, sat_ = 1.f, val_ = .92f;
+    int drag_ = 0;                        // 0 无 / 1 方块 / 2 色相条
+    std::shared_ptr<Input> hex_;
+    void Init();
+    D2D1_RECT_F SquareRc() const;
+    D2D1_RECT_F HueRc() const;
+    D2D1_RECT_F HexRc() const;
+    D2D1_RECT_F SwatchRc() const;
+    void Apply(float h, float s, float v, bool notify);
+    void PickAt(float x, float y);
+    void SyncHex();
+};
+
 // ---------------- 反馈类 ----------------
 
 enum class InfoTone { Info, Success, Warning, Danger };

@@ -208,6 +208,28 @@ void Gfx::RoundRect(D2D1_RECT_F rc, float rad, D2D1_COLOR_F c) {
     if (auto br = Solid(c)) rt->FillRoundedRectangle(D2D1::RoundedRect(rc, rad, rad), br);
 }
 
+void Gfx::FillLinear(D2D1_RECT_F rc, const std::vector<std::pair<float, D2D1_COLOR_F>>& stops,
+                     bool horizontal) {
+    if (!rt || stops.empty()) return;
+    std::vector<D2D1_GRADIENT_STOP> gs;
+    gs.reserve(stops.size());
+    for (const auto& s : stops) {
+        D2D1_COLOR_F c = s.second;
+        if (alpha < .999f) c.a = (std::min)(1.f, (std::max)(0.f, c.a * alpha));
+        float pos = (std::min)(1.f, (std::max)(0.f, s.first));
+        gs.push_back(D2D1_GRADIENT_STOP{ pos, c });
+    }
+    ComPtr<ID2D1GradientStopCollection> col;
+    if (FAILED(rt->CreateGradientStopCollection(gs.data(), (UINT)gs.size(), &col))) return;
+    auto p0 = D2D1::Point2F(rc.left, rc.top);
+    auto p1 = horizontal ? D2D1::Point2F(rc.right, rc.top) : D2D1::Point2F(rc.left, rc.bottom);
+    ComPtr<ID2D1LinearGradientBrush> br;
+    if (FAILED(rt->CreateLinearGradientBrush(
+            D2D1::LinearGradientBrushProperties(p0, p1), col.Get(), &br)))
+        return;
+    rt->FillRectangle(rc, br.Get());
+}
+
 void Gfx::StrokeRect(D2D1_RECT_F rc, float rad, D2D1_COLOR_F c, float w) {
     if (auto br = Solid(c)) rt->DrawRoundedRectangle(D2D1::RoundedRect(rc, rad, rad), br, w);
 }

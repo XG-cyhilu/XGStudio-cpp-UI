@@ -177,6 +177,7 @@ return vcui::CreateAppWindow(o);
 | `NavItem` | `Text`、`Glyph`、`Active`、`Clicked`；**同一父容器下自动构成单选组**（点谁谁亮、兄弟熄灭） |
 | `ListRow` | `Title`、`Sub`、`Right`、`Selected`、`Clicked` |
 | `Dropdown` | `Items`、`Selected`、`MenuWidth`、`Changed(int)`；菜单挂在 Overlay 层，可超出窗口边界 |
+| `ColorPicker` | `Color`、`SquareH`、`HueH`、`ShowHex`、`Swatches`(0xRRGGBB 预设)、`Changed(color)`、`SetColor()`；明度/饱和度方块 + 色相条 + 十六进制输入，可内嵌在页面里 |
 | `Tooltip` | 一般不用手动建：给任意控件设 `Widget::Tooltip = L"…"`，悬停 600ms 由 Surface 弹出 |
 | `InfoBar` | 由 `Surface::ShowInfoBar(text, tone, 秒)` 创建；右上角堆叠、统一宽度、超宽省略 |
 | `Dialog` | `Dialog::Open(host, 标题, 正文, actions, 点遮罩是否关闭, 卡片宽)`；全屏遮罩 + 居中卡片 |

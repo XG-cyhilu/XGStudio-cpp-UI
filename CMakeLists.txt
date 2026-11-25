@@ -41,6 +41,7 @@ set(VCUI_SOURCES
     src/VirtualList.cpp
     src/Controls.cpp
     src/Controls.More.cpp
+    src/ColorPicker.cpp
     src/Feedback.cpp
     src/Surface.cpp)
 

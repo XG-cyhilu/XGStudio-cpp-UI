@@ -26,6 +26,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 namespace vcui {
 
@@ -70,6 +71,9 @@ struct VCUI_API Gfx {
     void Clear(D2D1_COLOR_F c);
     void FillRect(D2D1_RECT_F rc, D2D1_COLOR_F c);
     void RoundRect(D2D1_RECT_F rc, float rad, D2D1_COLOR_F c);
+    // 线性渐变填充。stops 的 key 为 0..1 位置；horizontal 为真时左→右，否则上→下。
+    void FillLinear(D2D1_RECT_F rc, const std::vector<std::pair<float, D2D1_COLOR_F>>& stops,
+                    bool horizontal = true);
     void StrokeRect(D2D1_RECT_F rc, float rad, D2D1_COLOR_F c, float w = 1.f);
     void Line(float x1, float y1, float x2, float y2, D2D1_COLOR_F c, float w = 1.f);
     void Circle(float cx, float cy, float r, D2D1_COLOR_F c);

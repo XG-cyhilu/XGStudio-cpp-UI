@@ -226,6 +226,23 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         content->Add(CardBox(L"下拉与滑块", box));
     }
 
+    // 7. 颜色选取器
+    {
+        auto box = VBox(12.f);
+        auto pick = std::make_shared<ColorPicker>(Hex(0x0071EA));
+        pick->W = 320.f;
+        pick->Swatches = { 0x0071EA, 0x00B7C3, 0x107C10, 0xD97706, 0xD13438, 0x8764B8 };
+        auto hexLabel = std::make_shared<Label>(ToHex(pick->Color), 12.f, 400);
+        pick->Changed = [&app, hexLabel](D2D1_COLOR_F c) {
+            app.SetAccent(c);                  // 整个库的强调色即时跟着变
+            hexLabel->Text = ToHex(c);
+            app.Invalidate();
+        };
+        box->Add(pick);
+        box->Add(hexLabel);
+        content->Add(CardBox(L"颜色选取器", box));
+    }
+
     themeSeg->Changed = [&app](int i) {
         app.SetDark(i == 1);
         app.Invalidate();

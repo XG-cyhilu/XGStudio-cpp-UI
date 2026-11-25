@@ -20,6 +20,8 @@
 #include <windows.h>
 #include <d2d1.h>
 
+#include <string>
+
 namespace vcui {
 
 // ---- 颜色小工具 ----
@@ -39,7 +41,17 @@ inline D2D1_COLOR_F Alpha(D2D1_COLOR_F c, float a) { c.a = a; return c; }
 inline D2D1_COLOR_F Lighten(D2D1_COLOR_F c, float k) { return Mix(c, C(1, 1, 1, c.a), k); }
 inline D2D1_COLOR_F Darken(D2D1_COLOR_F c, float k) { return Mix(c, C(0, 0, 0, c.a), k); }
 inline float Luma(D2D1_COLOR_F c) { return .2126f * c.r + .7152f * c.g + .0722f * c.b; }
+
 inline D2D1_COLOR_F OnColor(D2D1_COLOR_F c) { return Luma(c) > .58f ? Hex(0x0b0b0c) : Hex(0xffffff); }
+
+// ---- 十六进制与 HSV ----
+// "#RRGGBB" / "RRGGBB" / "#RGB"，解析失败返回 false（alpha 固定为 1）
+VCUI_API bool ParseHex(const std::wstring& s, D2D1_COLOR_F& out);
+// 输出 "#RRGGBB"（大写）
+VCUI_API std::wstring ToHex(D2D1_COLOR_F c);
+// hue 0..360，s / v 0..1
+VCUI_API void RgbToHsv(D2D1_COLOR_F c, float& h, float& s, float& v);
+VCUI_API D2D1_COLOR_F HsvToRgb(float h, float s, float v);
 
 // ---- 色板 ----
 enum class Palette { Microsoft, GitHub };
