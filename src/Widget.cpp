@@ -17,6 +17,7 @@
 #include "vcui/Widget.h"
 #include "vcui/Surface.h"
 #include "vcui/Controls.h"
+#include "vcui/VirtualList.h"
 #include <cmath>
 #include <algorithm>
 
@@ -162,6 +163,11 @@ void Widget::StaggerIn(float dur, float dy, float step, float maxDelay) {
     auto next = [&]() { float v = std::min(d, maxDelay); d += step; return v; };
 
     for (auto& k : kids_) {
+        // 虚拟列表只让视口内的行存在，交给它自己给那几行错峰
+        if (auto* vl = dynamic_cast<VirtualList*>(k.get())) {
+            vl->AnimateIn(dur, dy, step, maxDelay);
+            continue;
+        }
         // 滚动列表里真正"一行一行出现"的是 ScrollView 内容容器的直接子项
         auto* sv = dynamic_cast<ScrollView*>(k.get());
         if (sv && !sv->Children().empty()) {

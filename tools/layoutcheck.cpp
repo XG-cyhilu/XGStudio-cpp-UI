@@ -21,6 +21,8 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <cmath>
+#include <cstdlib>
 
 using namespace vcui;
 
@@ -125,5 +127,67 @@ int main(int argc, char** argv) {
     std::printf("入场回归：%d 项错峰，首次延迟=%.2fs 末次=%.2fs；缓动 e(0)=%.2f e(.5)=%.2f e(1)=%.2f %s\n",
                 staggered, firstDelay < 0 ? 0.f : firstDelay, lastDelay, e0, e5, e1,
                 (animOk && easeOk && staggered > 0) ? "OK" : "FAIL");
-    return (g_bad == 0 && animOk && easeOk && staggered > 0) ? 0 : 2;
+
+    // 虚拟列表回归：六万条也只该存在视口内的十几行；滚动/跳转后行数与索引仍然对得上
+    int vlBad = 0;
+    auto vl = std::make_shared<VirtualList>();
+    vl->Id = L"virtlist";
+    vl->H = 400.f;
+    vl->RowHeight = 56.f;
+    vl->Gap = 6.f;
+    vl->ItemCount = 60000;
+    int built = 0;
+    vl->Build = [&built](int i) {
+        ++built;
+        auto r = std::make_shared<ListRow>(L"item", L"sub", std::to_wstring(i));
+        r->Id = L"vrow";
+        return r;
+    };
+    vl->Bind = [](Widget& w, int i) {
+        if (auto* lr = dynamic_cast<ListRow*>(&w)) lr->Right = std::to_wstring(i);
+        return true;
+    };
+    vl->Arrange(D2D1_RECT_F{ 0, 0, 900, 400 });
+    int live = vl->LiveRows();
+    int expectMax = (int)std::ceil(400.f / 62.f) + 2 * vl->Overscan + 2;
+    std::printf("虚拟列表：总条数=60000 实建=%d 存活=%d 首行=%d 末行=%d 内容高=%.0f\n",
+                built, live, vl->FirstVisible(), vl->LastVisible(), vl->ContentHeight());
+    if (live > expectMax) { std::printf("  存活行超过视口应有数量（%d > %d）\n", live, expectMax); ++vlBad; }
+    if (vl->FirstVisible() < 0 || vl->LastVisible() < vl->FirstVisible()) { std::printf("  可见区间无效\n"); ++vlBad; }
+    // 滚到一半：行数不涨，复用计数上涨，行里绑的是新索引
+    vl->ScrollToIndex(30000);
+    for (int i = 0; i < 60; ++i) vl->Update(1.f / 60.f);
+    int live2 = vl->LiveRows();
+    std::printf("  跳到第 30000 条后：存活=%d 累计新建=%d 复用=%d 首行=%d\n",
+                live2, built, vl->RecycledCount(), vl->FirstVisible());
+    if (live2 > expectMax) { std::printf("  滚动后存活行失控\n"); ++vlBad; }
+    if (vl->RecycledCount() <= 0 || built > expectMax + 6) {
+        std::printf("  没有复用旧行（新建=%d 复用=%d）\n", built, vl->RecycledCount());
+        ++vlBad;
+    }
+    bool boundOk = true;
+    for (auto& k : vl->Children()) {
+        if (!k->Visible) continue;
+        auto* lr = dynamic_cast<ListRow*>(k.get());
+        if (!lr) { boundOk = false; continue; }
+        // 复用后行内容必须换成新索引：Right 应该落在当前可见区间内
+        wchar_t* end = nullptr;
+        long v = std::wcstol(lr->Right.c_str(), &end, 10);
+        if (end == lr->Right.c_str() || v < vl->FirstVisible() || v > vl->LastVisible()) boundOk = false;
+    }
+    if (!boundOk) { std::printf("  复用行的内容没跟着索引更新\n"); ++vlBad; }
+    // 滚动到底：最后一行必须落在内容高度之内
+    vl->EnsureVisible(vl->ItemCount - 1);
+    for (int i = 0; i < 120; ++i) vl->Update(1.f / 60.f);
+    int lastIdx = vl->LastVisible();
+    std::printf("  滚到底：末行=%d（应为 %d）滚动偏移=%.0f/%.0f\n",
+                lastIdx, vl->ItemCount - 1, vl->ScrollY, vl->MaxScroll());
+    if (lastIdx != vl->ItemCount - 1 || std::abs(vl->ScrollY - vl->MaxScroll()) > 1.f) {
+        std::printf("  滚到底没对齐\n");
+        ++vlBad;
+    }
+    std::printf("虚拟列表回归：%s\n", vlBad == 0 ? "OK" : "FAIL");
+
+    return (g_bad == 0 && animOk && easeOk && staggered > 0 && vlBad == 0) ? 0 : 2;
 }
+

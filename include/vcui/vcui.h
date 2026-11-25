@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 #include "vcui/Theme.h"
 #include "vcui/Widget.h"
 #include "vcui/Layout.h"
+#include "vcui/VirtualList.h"
 #include "vcui/Controls.h"
 #include "vcui/Surface.h"
 #include "vcui/App.h"
@@ -32,3 +33,4 @@ namespace vcui {
 inline constexpr const wchar_t* Version = L"1.0.0";
 
 } // namespace vcui
+

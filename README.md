@@ -192,6 +192,7 @@ return vcui::CreateAppWindow(o);
 | `Card` | 底色 + 圆角 + 描边 + 投影，`Shadow` / `Border` / `Radius` / `Fill` 可关 |
 | `Grid(cols, gap)` | 等宽网格，行高取该行最高的子项（信息卡、磁贴布局） |
 | `ScrollView` | 单子项纵向滚动；滚轮带缓动、**自带自绘滚动条**（静默 2px，悬停/滚动时变粗，可拖拽） |
+| `VirtualList` | **虚拟列表**：数据上万条也只实例化视口里那几行，滚走立即回收给下面的行复用（见下节） |
 | `Absolute` | 子项用 `X/Y/W/H` 绝对定位 |
 | `Spacer(size)` / `Divider()` | 留白（`size=0` 时 `Grow=1` 撑满）/ 1px 分隔线（`Vertical` 可竖排） |
 
@@ -200,6 +201,33 @@ return vcui::CreateAppWindow(o);
 1. 尺寸三态：`W/H > 0` 是硬尺寸，`< 0` 交给内容或容器，`Grow` 参与主轴剩余空间分配。
 2. 子项一律夹在容器内容区里（`Stack::LayoutCol/Row` 会夹 `fr.bottom`/`fr.right`）。否则某一项算大了会把兄弟顶出窗口。
 3. `Desired` 返回真实内容尺寸并夹到可用尺寸，不返回"可用尺寸"本身——否则父容器以为子项已占满，`freeSpace` 直接变 0，`Grow` 分配就失效。
+
+### 虚拟列表（VirtualList）
+
+`ScrollView + VBox` 是"每一条都建一个控件"，三千行就开始卡；`VirtualList` 是"只建看得见的那几行"。
+
+```cpp
+auto list = std::make_shared<VirtualList>();
+list->RowHeight = 64.f;      // 行必须等高，虚拟化靠它算偏移
+list->Gap = 6.f;
+list->ItemCount = 1000000;   // 一百万条也就建十来行
+
+list->Build = [](int i) {    // 造行：返回一个没有父节点的控件
+    return std::make_shared<ListRow>(L"条目 #" + std::to_wstring(i + 1), L"副标题", L"");
+};
+list->Bind = [](Widget& w, int i) {   // 复用：把回收的行改写成第 i 条
+    auto* r = dynamic_cast<ListRow*>(&w);
+    r->Title = L"条目 #" + std::to_wstring(i + 1);
+    return true;              // 返回 false 表示这条行结构变了，内部会重造
+};
+list->AnimateIn();            // 可选：数据异步回来时让可见行错峰淡入
+```
+
+- **滚动**：滚轮一格 = 一行（滚动手感跟行高走）、拖动滚动条、`Up/Down` 一行、`PgUp/PgDn` 一屏、`Home/End` 两端；缓动曲线与 `ScrollView` 一致，滚动条同款自绘。
+- **回收**：滚出视口的行不销毁，`Visible = false` 停放；下一批索引优先拿停放的行调 `Bind` 改写。没有 `Bind` 就退化成重新 `Build`（功能一致，但每次都要新建控件）。
+- **定位**：`ScrollToIndex(i, center)` / `EnsureVisible(i)`；`FirstVisible()` / `LastVisible()` 是含预建行的实际区间，`LiveRows()` 是当前真实存在的行数（回归测试就看它不随数据量增长）。
+- **动画**：`StaggerIn` 作用到含 `VirtualList` 的容器时会自动转成 `AnimateIn`，只动视口内那几行，不会给一百万条都排队。
+- **换个数据集**：`Reset()` 丢掉全部行；只改 `ItemCount` 也会自动重排，但复用旧行的内容要 `Bind` 才能跟上。
 
 ## 主题与排版
 

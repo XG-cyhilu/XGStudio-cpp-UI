@@ -38,6 +38,7 @@ set(VCUI_SOURCES
     src/App.cpp
     src/Widget.cpp
     src/Layout.cpp
+    src/VirtualList.cpp
     src/Controls.cpp
     src/Controls.More.cpp
     src/Feedback.cpp
@@ -91,6 +92,7 @@ if (VCUI_BUILD_DEMO)
     vcui_add_demo(VCUIMinimal demo/minimal.cpp)  # 最小用法示例
     vcui_add_demo(VCUIMultiWin demo/multiwin.cpp)  # 多窗口 + 共享消息循环
     vcui_add_demo(VCUIFrameDemo demo/frame.cpp)  # 自绘边框 + 启动器排版打样
+    vcui_add_demo(VCUIVirtualDemo demo/virtual.cpp)  # 虚拟列表（百万条数据）
 
     # 无窗口布局自检：只算几何，打印每个节点的 frame 并统计越界
     add_executable(VCUILayoutCheck tools/layoutcheck.cpp)
@@ -119,3 +121,4 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/VCUIConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/VCUIConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/VCUI)
+
