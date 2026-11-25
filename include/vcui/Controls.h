@@ -336,6 +336,18 @@ private:
     void SyncHex();
 };
 
+// 一个图标：给一段 SVG path，按 Stroke 描边（Filled=true 时改填充）。
+class VCUI_API SvgIcon : public Widget {
+public:
+    std::wstring Path;
+    float IconSize = 14.f;       // 正方形边长；W/H>0 时以 W/H 为准
+    float Stroke = 1.6f;
+    bool Filled = false;
+    D2D1_COLOR_F Color{ 0, 0, 0, 0 };   // a>0 时覆盖主题色
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    void Paint(PaintCtx& ctx) override;
+};
 // 加载中的转圈：一圈小点，最亮的一点随时间旋转（不需要路径几何，纯圆点）
 class VCUI_API Spinner : public Widget {
 public:

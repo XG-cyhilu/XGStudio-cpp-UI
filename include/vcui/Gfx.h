@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,6 +79,11 @@ struct VCUI_API Gfx {
     void Circle(float cx, float cy, float r, D2D1_COLOR_F c);
     void StrokeCircle(float cx, float cy, float r, D2D1_COLOR_F c, float w = 1.f);
     void Shadow(D2D1_RECT_F rc, float rad, float spread, float dy, D2D1_COLOR_F c);
+
+    // 画一条 SVG path（subpath 用 M/L/H/V/C/Q/Z，绝对与相对都认）。
+    // 路径按 bbox 等比缩放进 box 居中；stroke<=0 时改走填充。
+    void SvgPath(D2D1_RECT_F box, const std::wstring& d, D2D1_COLOR_F c, float stroke = 1.6f,
+                 bool filled = false);
 
     void PushClip(D2D1_RECT_F rc);
     void PopClip();

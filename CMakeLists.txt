@@ -43,6 +43,7 @@ set(VCUI_SOURCES
     src/Controls.More.cpp
     src/ColorPicker.cpp
     src/Loading.cpp
+    src/Svg.cpp
     src/Feedback.cpp
     src/Surface.cpp)
 
