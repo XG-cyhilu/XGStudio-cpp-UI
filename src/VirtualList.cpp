@@ -161,6 +161,8 @@ void VirtualList::LayoutChildren() {
             if (!w) { s.index = -1; continue; }
             s.w = w;
             Add(w);
+            // 新行只有结构，内容同样要 Bind 一次（Build 只管搭骨架）
+            if (Bind) Bind(*w, i);
         }
         s.w->Visible = true;
         s.index = i;

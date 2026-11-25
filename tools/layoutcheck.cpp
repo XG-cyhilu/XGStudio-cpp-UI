@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     int built = 0;
     vl->Build = [&built](int i) {
         ++built;
-        auto r = std::make_shared<ListRow>(L"item", L"sub", std::to_wstring(i));
+        auto r = std::make_shared<ListRow>(L"item", L"sub", L"");   // 内容交给 Bind 填，Build 只搭结构
         r->Id = L"vrow";
         return r;
     };
@@ -190,4 +190,5 @@ int main(int argc, char** argv) {
 
     return (g_bad == 0 && animOk && easeOk && staggered > 0 && vlBad == 0) ? 0 : 2;
 }
+
 
