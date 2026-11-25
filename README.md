@@ -172,7 +172,8 @@ return vcui::CreateAppWindow(o);
 | `Input` | `Text`、`Placeholder`、`Caret`、`SelAnchor`、`MaxWidth`、`Changed(str)`、`Submitted` |
 | `Slider` | `Value`(0..1)、`Changed(float)`；点轨道即吸附，键盘可步进 |
 | `Progress` | `Value`(0..1)，值变化带缓动；`Indeterminate = true` 切不确定态——一段 accent 在轨道里来回循环，不用手动喂进度 |
-| `Segmented` | `Items`、`Active`、`Changed(int)`；选中胶囊在段间滑动 |
+| `Spinner` | `Size`、`Dots`、`DotScale`、`Color`（默认 accent）、`Speed`；一圈小点循环旋转，亮度按序递增形成「追尾」，`Update` 常返回 true 保证帧循环不睡 |
+| `Skeleton` | `Radius`、`Period`、`Delay`、`Base`；占位块按余弦呼吸，`Skeleton(h)` 构造时直接给高度，多条错开 `Delay` 就是波次感 || `Segmented` | `Items`、`Active`、`Changed(int)`；选中胶囊在段间滑动 |
 | `Badge` | `Text`、`ToneKind`（Neutral / Accent / Success / Warning / Danger） |
 | `NavItem` | `Text`、`Glyph`、`Active`、`Clicked`；**同一父容器下自动构成单选组**（点谁谁亮、兄弟熄灭） |
 | `ListRow` | `Title`、`Sub`、`Right`、`Selected`、`Clicked` |

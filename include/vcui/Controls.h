@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -334,6 +334,45 @@ private:
     void Apply(float h, float s, float v, bool notify);
     void PickAt(float x, float y);
     void SyncHex();
+};
+
+// 加载中的转圈：一圈小点，最亮的一点随时间旋转（不需要路径几何，纯圆点）
+class VCUI_API Spinner : public Widget {
+public:
+    float Size = 16.f;          // 直径
+    float Dots = 8.f;           // 点个数
+    float DotScale = 1.15f;     // 点半径 = Size/Dots * DotScale
+    D2D1_COLOR_F Color{ 0, 0, 0, 0 };   // a == 0 时用主题强调色
+    float Speed = 1.15f;        // 每秒圈数
+
+    Spinner() { W = 16.f; H = 16.f; }
+    explicit Spinner(float size) : Size(size) { W = size; H = size; }
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    bool Update(float dt) override;
+    void Paint(PaintCtx& ctx) override;
+
+private:
+    float phase_ = 0.f;
+};
+
+// 骨架块：一条会呼吸的圆角占位，Delay 用来给多行错峰
+class VCUI_API Skeleton : public Widget {
+public:
+    float Radius = 6.f;
+    float Period = 1.4f;        // 一次呼吸的秒数
+    float Delay = 0.f;          // 相对相位，0..Period
+    D2D1_COLOR_F Base{ 0, 0, 0, 0 };    // a == 0 时按主题取"浅一档的灰"
+
+    Skeleton() { H = 14.f; }
+    explicit Skeleton(float h) { H = h; }
+
+    D2D1_SIZE_F Desired(float availW, float availH) override;
+    bool Update(float dt) override;
+    void Paint(PaintCtx& ctx) override;
+
+private:
+    float t_ = 0.f;
 };
 
 // ---------------- 反馈类 ----------------
