@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -216,7 +216,8 @@ bool Widget::Update(float dt) {
         }
     }
 
-    for (auto& k : kids_) changed |= k->Update(dt);
+    // 不可见的子树不参与动画推进：否则隐藏的转圈/骨架会一直把帧循环拉醒
+    for (auto& k : kids_) if (k->Visible) changed |= k->Update(dt);
     return changed;
 }
 

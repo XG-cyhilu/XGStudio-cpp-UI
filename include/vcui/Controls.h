@@ -125,6 +125,9 @@ public:
     void OnDrag(float x, float y) override;
     bool OnImeMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) override;
     bool ImeComposing() const { return imeActive_; }
+
+    // 光标闪烁（由 Surface 的 530ms 定时器驱动，避免为了闪烁一直跑 60fps 帧循环）
+    void ToggleCaret() { blinkOn_ = !blinkOn_; AnimDirty = true; }
     std::function<void(const std::wstring&)> Changed;
     std::function<void()> Submitted;
 

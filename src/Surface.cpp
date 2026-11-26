@@ -16,6 +16,7 @@
 
 #include "vcui/Surface.h"
 #include "vcui/App.h"
+#include "vcui/Controls.h"
 #include <dwmapi.h>
 #include <windowsx.h>
 #include <imm.h>
@@ -223,8 +224,8 @@ void Surface::Tick(float dt) {
         }
         lastDirtyN_ = nDirty;
         lastDirtyRc_ = acc;
-    } else if (!(focus_ && focus_->Focusable())) {
-        animating_ = false;   // 没有动画也没有光标闪烁，帧循环可以睡了
+    } else {
+        animating_ = false;   // 没有动画，帧循环睡觉；光标闪烁由定时器负责
     }
 }
 
@@ -372,7 +373,7 @@ void Surface::CloseInfoBars() {
 void Surface::ForgetWidget(Widget* w) {
     if (!w) return;
     // 这里不回调 OnFocus(false)：对象已经在析构，不能再碰它
-    if (focus_ == w) focus_ = nullptr;
+    if (focus_ == w) { focus_ = nullptr; if (hwnd_) KillTimer(hwnd_, 3); }
     if (hot_ == w) hot_ = nullptr;
     if (active_ == w) active_ = nullptr;
     if (tipPending_ == w) tipPending_ = nullptr;
@@ -395,6 +396,8 @@ void Surface::SetFocus(Widget* w) {
         focus_->OnFocus(false);
     }
     focus_ = w;
+    if (dynamic_cast<Input*>(focus_)) SetTimer(hwnd_, 3, 530, nullptr);
+    else KillTimer(hwnd_, 3);
     if (focus_) {
         focus_->Focus = true;
         focus_->OnFocus(true);
@@ -766,6 +769,15 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
             Widget* w = tipPending_;
             tipPending_ = nullptr;
             if (w && w == hot_ && !mouseDown_) ShowTooltipFor(w);
+            return 0;
+        }
+        if (wp == 3) {                      // 输入框光标闪烁：静止时靠它，不拉帧循环
+            if (auto* in = dynamic_cast<Input*>(focus_)) {
+                in->ToggleCaret();
+                InvalidateRectD(in->Frame());
+            } else {
+                KillTimer(hwnd_, 3);
+            }
             return 0;
         }
         if (wp == 2) {                      // 提示条计时：静止时没有帧循环，靠这里推时钟

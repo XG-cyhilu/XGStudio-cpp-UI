@@ -290,16 +290,8 @@ int Input::PosFromX(float x) {
 }
 
 bool Input::Update(float dt) {
-    bool changed = Widget::Update(dt);
-    if (Focus) {
-        blinkT_ += dt;
-        float ph = std::fmod(blinkT_, 1.06f);
-        bool on = ph < .55f;
-        if (on != blinkOn_) { blinkOn_ = on; changed = true; AnimDirty = true; }
-    } else if (!blinkOn_) {
-        blinkOn_ = true;
-    }
-    return changed;
+    // 光标闪烁交给 Surface 的定时器，这里不再需要常驻帧动画
+    return Widget::Update(dt);
 }
 
 void Input::Paint(PaintCtx& ctx) {
@@ -351,6 +343,7 @@ void Input::Paint(PaintCtx& ctx) {
 void Input::OnFocus(bool on) {
     blinkT_ = 0.f;
     blinkOn_ = true;
+    AnimDirty = true;
     if (on) {
         ClampCaret();
         Caret = (int)Text.size();
