@@ -299,6 +299,7 @@ void Dropdown::OpenMenu() {
     card->W = menuW;
     card->H = menuH;
 
+    card->Opacity = 0.f;       // 先透明再挂上去：否则第一帧会以全不透明画出来，看起来闪一下
     menu_ = card;
     Open = true;
     Host->AddOverlay(card);
