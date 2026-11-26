@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -271,7 +271,7 @@ void Dropdown::OpenMenu() {
 
     auto card = std::make_shared<Card>();
     card->PL = card->PT = card->PR = card->PB = 4.f;
-    card->Radius = 6.f;
+    card->Radius = 12.f;   // Fluent 2 X-Large：浮层
     card->Shadow = true;
 
     auto box = VBox(0.f);

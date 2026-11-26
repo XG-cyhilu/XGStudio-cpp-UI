@@ -119,7 +119,7 @@ Tokens GetTokens(Palette p, bool dark) {
 
 Metrics GetMetrics() {
     Metrics m;
-    m.radiusBtn = 2; m.radiusInput = 2; m.radiusCard = 8; m.radiusPanel = 8;
+    m.radiusBtn = 4; m.radiusInput = 4; m.radiusCard = 8; m.radiusPanel = 12;
     m.controlH = 34; m.rowH = 44; m.gap = 12; m.padCard = 24;
     m.fCaption = 10; m.fLabel = 12; m.fBody = 14; m.fSub = 20; m.fHeading = 28; m.fTitle = 32;
     m.borderW = 1.f;

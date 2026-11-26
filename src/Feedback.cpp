@@ -221,7 +221,7 @@ std::shared_ptr<Dialog> Dialog::Open(Surface* host, std::wstring title, std::wst
 
     auto card = std::make_shared<Card>();
     card->Pad(24.f);
-    card->Radius = 8.f;
+    card->Radius = 12.f;
     card->Shadow = true;
     dlg->card_ = card;
     dlg->Add(card);
