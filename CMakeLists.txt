@@ -73,7 +73,7 @@ if (VCUI_STATIC_RUNTIME)
     target_compile_options(vcui PRIVATE /MT)
 endif()
 
-target_link_libraries(vcui PUBLIC d2d1 dwrite dwmapi uxtheme user32 gdi32 ole32 imm32)
+target_link_libraries(vcui PUBLIC d2d1 d3d11 dxgi dxguid dwrite dwmapi uxtheme user32 gdi32 ole32 imm32)
 
 set_target_properties(vcui PROPERTIES
     CXX_STANDARD 17

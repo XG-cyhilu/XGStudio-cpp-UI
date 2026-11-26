@@ -47,7 +47,9 @@ static int FmtKeyOf(float px, int weight, const wchar_t* family, HAlign ha, VAli
 
 bool Gfx::Init(HWND hwnd) {
     if (!factory) {
-        if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, factory.GetAddressOf())))
+        D2D1_FACTORY_OPTIONS fo{};
+        if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1),
+                                     &fo, reinterpret_cast<void**>(factory.GetAddressOf()))))
             return false;
     }
     if (!dwrite) {
@@ -57,69 +59,145 @@ bool Gfx::Init(HWND hwnd) {
 
     RECT rc{};
     GetClientRect(hwnd, &rc);
-    uint32_t dpi = GetDpiForWindow(hwnd);
-    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties();
-    props.dpiX = props.dpiY = (float)dpi;
-    D2D1_HWND_RENDER_TARGET_PROPERTIES hprops = D2D1::HwndRenderTargetProperties(
-        hwnd, D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top),
-        D2D1_PRESENT_OPTIONS_IMMEDIATELY);
-    if (FAILED(factory->CreateHwndRenderTarget(props, hprops, hwndRt.GetAddressOf()))) return false;
+    UINT w = (UINT)(rc.right > rc.left ? rc.right - rc.left : 1);
+    UINT h = (UINT)(rc.bottom > rc.top ? rc.bottom - rc.top : 1);
+    dpi_ = (float)GetDpiForWindow(hwnd);
+    if (dpi_ <= 0.f) dpi_ = 96.f;
 
-    dpi_ = (float)dpi;
-    dpi_ = (float)dpi;
+    // D3D11 设备：BGRA 支持是 D2D 互操作的前提；硬件失败退回 WARP（远程桌面/无显卡也能跑）
+    if (!d3d) {
+        D3D_FEATURE_LEVEL want[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
+                                     D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0 };
+        D3D_FEATURE_LEVEL got{};
+        HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
+                                       D3D11_CREATE_DEVICE_BGRA_SUPPORT, want, 4, D3D11_SDK_VERSION,
+                                       d3d.GetAddressOf(), &got, d3dCtx.GetAddressOf());
+        if (FAILED(hr))
+            hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr,
+                                   D3D11_CREATE_DEVICE_BGRA_SUPPORT, want, 4, D3D11_SDK_VERSION,
+                                   d3d.GetAddressOf(), &got, d3dCtx.GetAddressOf());
+        if (FAILED(hr)) {
+            d3d.Reset();
+            d3dCtx.Reset();
+            return false;
+        }
+    }
+    if (!d2dDevice) {
+        Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDev;
+        if (FAILED(d3d.As(&dxgiDev))) return false;
+        if (FAILED(factory->CreateDevice(dxgiDev.Get(), d2dDevice.GetAddressOf()))) return false;
+    }
+
+    // 交换链：FLIP 模型，两缓冲
+    if (!swap) {
+        Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDev;
+        if (FAILED(d3d.As(&dxgiDev))) return false;
+        Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+        if (FAILED(dxgiDev->GetAdapter(adapter.GetAddressOf()))) return false;
+        Microsoft::WRL::ComPtr<IDXGIFactory2> fx;
+        if (FAILED(adapter->GetParent(IID_PPV_ARGS(&fx)))) return false;
+        DXGI_SWAP_CHAIN_DESC1 sd{};
+        sd.Width = w;
+        sd.Height = h;
+        sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        sd.SampleDesc.Count = 1;
+        sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        sd.BufferCount = 2;
+        sd.Scaling = DXGI_SCALING_STRETCH;
+        sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+        sd.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+        if (FAILED(fx->CreateSwapChainForHwnd(d3d.Get(), hwnd, &sd, nullptr, nullptr,
+                                              swap.GetAddressOf())))
+            return false;
+    }
+    if (!dc) {
+        if (FAILED(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                  dc.GetAddressOf())))
+            return false;
+        rt = dc;
+    }
+
     layer.Reset();
-    rt.Reset();
     brushes.clear();
+    shadowCache.clear();
     clipDepth = 0;
     alpha = 1.f;
-    if (!EnsureLayer((UINT)(rc.right - rc.left), (UINT)(rc.bottom - rc.top))) return false;
+    if (!EnsureSwapTarget(w, h)) return false;
+    if (!EnsureLayer(w, h)) return false;
+    return true;
+}
+
+bool Gfx::EnsureSwapTarget(UINT w, UINT h) {
+    if (!swap || !dc) return false;
+    if (swapBmp) {
+        D2D1_SIZE_U ps = swapBmp->GetPixelSize();
+        if (ps.width == w && ps.height == h) return true;
+    }
+    swapBmp.Reset();
+    Microsoft::WRL::ComPtr<IDXGISurface> surf;
+    if (FAILED(swap->GetBuffer(0, IID_PPV_ARGS(&surf)))) return false;
+    // 传自定义 properties 会被 D2D 判 E_INVALIDARG，交给 D2D 按 surface 自身格式/alpha 推断
+    if (FAILED(dc->CreateBitmapFromDxgiSurface(surf.Get(), nullptr, swapBmp.GetAddressOf()))) return false;
     return true;
 }
 
 bool Gfx::EnsureLayer(UINT w, UINT h) {
-    if (!hwndRt || w == 0 || h == 0) return false;
+    if (!dc || !swap || w == 0 || h == 0) return false;
     if (layer) {
-        D2D1_SIZE_F sz = layer->GetSize();
-        if ((UINT)(sz.width + .5f) == w && (UINT)(sz.height + .5f) == h) return true;
+        D2D1_SIZE_U ps = layer->GetPixelSize();
+        if (ps.width == w && ps.height == h) {
+            dc->SetTarget(layer.Get());
+            return true;
+        }
     }
     layer.Reset();
-    rt.Reset();
     brushes.clear();
     shadowCache.clear();
-    if (FAILED(hwndRt->CreateCompatibleRenderTarget(D2D1::SizeF((float)w, (float)h),
-                                                    layer.GetAddressOf())))
-        return false;
-    layer->SetDpi(dpi_, dpi_);
-    layer->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-    layer->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
-    rt = layer;
+    D2D1_BITMAP_PROPERTIES1 bp{};
+    bp.pixelFormat = D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+    bp.dpiX = bp.dpiY = dpi_;
+    bp.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
+    if (FAILED(dc->CreateBitmap(D2D1::SizeU(w, h), nullptr, 0, bp, layer.GetAddressOf()))) return false;
+    dc->SetTarget(layer.Get());
+    dc->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+    dc->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
     return true;
 }
 
 void Gfx::Present() {
-    if (!hwndRt || !layer) return;
-    ComPtr<ID2D1Bitmap> bmp;
-    if (FAILED(layer->GetBitmap(bmp.GetAddressOf()))) return;
-    D2D1_SIZE_F sz = layer->GetSize();
-    hwndRt->BeginDraw();
-    hwndRt->SetTransform(D2D1::Matrix3x2F::Identity());
-    hwndRt->DrawBitmap(bmp.Get(), D2D1::RectF(0, 0, sz.width, sz.height), 1.f,
-                       D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
-    HRESULT hr = hwndRt->EndDraw();
+    if (!swap || !layer || !dc || !swapBmp) return;
+    dc->SetTarget(swapBmp.Get());
+    dc->SetDpi(dpi_, dpi_);
+    dc->BeginDraw();
+    dc->SetTransform(D2D1::Matrix3x2F::Identity());
+    D2D1_SIZE_F sz = swapBmp->GetSize();
+    dc->DrawBitmap(layer.Get(), D2D1::RectF(0, 0, sz.width, sz.height), 1.f,
+                   D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+    HRESULT hr = dc->EndDraw();
     if (hr == D2DERR_RECREATE_TARGET) {
-        hwndRt.Reset();
-        layer.Reset();
-        rt.Reset();
-        brushes.clear();
-        shadowCache.clear();
+        DropResources();
+        return;
     }
+    swap->Present(1, 0);
+    dc->SetDpi(dpi_, dpi_);
+    dc->SetTarget(layer.Get());
 }
 
 void Gfx::Resize(UINT w, UINT h) {
-    if (hwndRt) {
-        hwndRt->Resize(D2D1::SizeU(w, h));
-        EnsureLayer(w, h);
+    if (!swap || !dc || w == 0 || h == 0) return;
+    if (layer) {
+        D2D1_SIZE_U ps = layer->GetPixelSize();
+        if (ps.width == w && ps.height == h) return;
     }
+    dc->SetTarget(nullptr);
+    swapBmp.Reset();
+    layer.Reset();
+    if (FAILED(swap->ResizeBuffers(2, w, h, DXGI_FORMAT_B8G8R8A8_UNORM, 0))) {
+        DropResources();
+        return;
+    }
+    if (!EnsureSwapTarget(w, h)) return;
+    EnsureLayer(w, h);
 }
 
 void Gfx::DropResources() {
@@ -128,11 +206,16 @@ void Gfx::DropResources() {
     layouts.clear();
     clipDepth = 0;
     alpha = 1.f;
+    if (dc) dc->SetTarget(nullptr);
     layer.Reset();
+    swapBmp.Reset();
     rt.Reset();
-    hwndRt.Reset();
+    dc.Reset();
+    swap.Reset();
+    d2dDevice.Reset();
+    d3dCtx.Reset();
+    d3d.Reset();
 }
-
 ID2D1SolidColorBrush* Gfx::Solid(D2D1_COLOR_F c) {
     if (!rt) return nullptr;
     if (alpha < .999f) {
@@ -273,18 +356,22 @@ void Gfx::Shadow(D2D1_RECT_F rc, float rad, float spread, float dy, D2D1_COLOR_F
 
     if (!cached) {
         // 阴影本来就是柔的：按半像素密度渲染再放大，成本降到 1/4
-        ComPtr<ID2D1BitmapRenderTarget> tmp;
+        ComPtr<ID2D1Bitmap1> tmp;
         D2D1_SIZE_U px = D2D1::SizeU((UINT)(bw * .5f + .5f), (UINT)(bh * .5f + .5f));
-        if (FAILED(rt->CreateCompatibleRenderTarget(D2D1::SizeF(bw, bh), px,
-                                                    D2D1::PixelFormat(),
-                                                    D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
-                                                    tmp.GetAddressOf())))
-            return;
-        tmp->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-        tmp->BeginDraw();
-        tmp->Clear(D2D1::ColorF(0, 0, 0, 0));
+        D2D1_BITMAP_PROPERTIES1 bp{};
+        bp.pixelFormat = D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+        bp.dpiX = bp.dpiY = dpi_ * 2.f;
+        bp.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+        if (FAILED(dc->CreateBitmap(px, nullptr, 0, bp, tmp.GetAddressOf()))) return;
+
+        auto* prevTarget = layer.Get();
+        dc->SetTarget(tmp.Get());
+        dc->SetDpi(dpi_ * 2.f, dpi_ * 2.f);
+        dc->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        dc->BeginDraw();
+        dc->Clear(D2D1::ColorF(0, 0, 0, 0));
         ComPtr<ID2D1SolidColorBrush> br;
-        tmp->CreateSolidColorBrush(c, br.GetAddressOf());
+        dc->CreateSolidColorBrush(c, br.GetAddressOf());
         const int N = 4;
         float ex = (bw - w) * .5f;           // 水平居中
         float ey = (bh - h) * .5f + dy * .5f; // 预留上下余量
@@ -295,13 +382,14 @@ void Gfx::Shadow(D2D1_RECT_F rc, float rad, float spread, float dy, D2D1_COLOR_F
             D2D1_COLOR_F cc = c;
             cc.a = c.a / float(N);
             br->SetColor(cc);
-            tmp->FillRoundedRectangle(D2D1::RoundedRect(r2, rad + e, rad + e), br.Get());
+            dc->FillRoundedRectangle(D2D1::RoundedRect(r2, rad + e, rad + e), br.Get());
         }
-        tmp->EndDraw();
-        ComPtr<ID2D1Bitmap> bmp;
-        tmp->GetBitmap(bmp.GetAddressOf());
+        dc->EndDraw();
+
+        dc->SetTarget(prevTarget);
+        dc->SetDpi(dpi_, dpi_);
         if (shadowCache.size() > 64) shadowCache.clear();
-        auto ins = shadowCache.emplace(key, bmp);
+        auto ins = shadowCache.emplace(key, tmp);
         cached = &ins.first->second;
     }
     if (cached && *cached) {

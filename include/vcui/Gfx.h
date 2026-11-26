@@ -19,7 +19,10 @@
 
 #include <windows.h>
 #include <d2d1.h>
+#include <d2d1_1.h>
 #include <d2d1helper.h>
+#include <d3d11.h>
+#include <dxgi1_2.h>
 #include <dwrite.h>
 #include <wrl/client.h>
 
@@ -37,11 +40,18 @@ enum class VAlign { Top, Middle, Bottom };
 // 画笔与文本格式按内容缓存，避免每帧重新分配。
 // 自定义控件时在 Paint() 里用它画图，不要直接碰 ID2D1RenderTarget。
 struct VCUI_API Gfx {
-    Microsoft::WRL::ComPtr<ID2D1Factory> factory;
+    // Direct2D 1.1：底层是 D3D11 + DXGI 交换链，绘制入口是 ID2D1DeviceContext，
+    // 这样才有 ID2D1Effect（模糊、色彩矩阵…）和自定义着色器（自定义材质）可用。
+    Microsoft::WRL::ComPtr<ID2D1Factory1> factory;
     Microsoft::WRL::ComPtr<IDWriteFactory> dwrite;
-    Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> hwndRt;    // 只负责把层贴到窗口
-    Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> layer;  // 所有绘制都发生在这一层，跨帧保留
-    Microsoft::WRL::ComPtr<ID2D1RenderTarget> rt;           // = layer，绘制入口
+    Microsoft::WRL::ComPtr<ID3D11Device> d3d;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3dCtx;
+    Microsoft::WRL::ComPtr<ID2D1Device> d2dDevice;
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext> dc;          // 绘制入口（= rt）
+    Microsoft::WRL::ComPtr<IDXGISwapChain1> swap;            // 只负责把层贴到窗口
+    Microsoft::WRL::ComPtr<ID2D1Bitmap1> swapBmp;            // 交换链后备缓冲的 D2D 视图
+    Microsoft::WRL::ComPtr<ID2D1Bitmap1> layer;             // 所有绘制都发生在这一层，跨帧保留
+    Microsoft::WRL::ComPtr<ID2D1RenderTarget> rt;           // = dc，绘制入口（兼容旧代码）
     std::unordered_map<int, Microsoft::WRL::ComPtr<IDWriteTextFormat>> fmts;
     std::unordered_map<uint32_t, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>> brushes;
     // 文本布局缓存：字符串 + 格式 → IDWriteTextLayout，避免每帧重新 shaping
@@ -59,10 +69,15 @@ struct VCUI_API Gfx {
     bool Ready() const { return rt != nullptr; }
     // 确保离屏层尺寸正确（客户区像素）
     bool EnsureLayer(UINT w, UINT h);
+    bool EnsureSwapTarget(UINT w, UINT h);
     // 把离屏层整层贴到窗口
     void Present();
-    D2D1_SIZE_F Size() const { return hwndRt ? hwndRt->GetSize() : D2D1::SizeF(0, 0); }
+    D2D1_SIZE_F Size() const { return layer ? layer->GetSize() : D2D1::SizeF(0, 0); }
     void DropResources();
+
+    // 设备上下文（Direct2D 1.1）：做效果链、自定义材质时直接用它 CreateEffect。
+    ID2D1DeviceContext* Dc() const { return dc.Get(); }
+    ID3D11Device* D3d() const { return d3d.Get(); }
 
     IDWriteTextFormat* Fmt(float px, int weight, const wchar_t* family = L"Microsoft YaHei",
                            HAlign ha = HAlign::Left, VAlign va = VAlign::Top, bool wrap = false);
