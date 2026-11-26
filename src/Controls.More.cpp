@@ -217,6 +217,10 @@ bool Dropdown::Update(float dt) {
             if (Host) {
                 Host->ClearDismissIf(this);
                 Host->RemoveOverlayDeferred(menu_.get());
+                if (catcher_) {
+                    Host->RemoveOverlayDeferred(catcher_.get());
+                    catcher_.reset();
+                }
             }
             menu_.reset();
         }
@@ -261,6 +265,10 @@ void Dropdown::OpenMenu() {
         Host->RemoveOverlay(menu_.get());
         menu_.reset();
     }
+    if (catcher_) {
+        Host->RemoveOverlay(catcher_.get());
+        catcher_.reset();
+    }
     menuRows_.clear();
     aLinear = 0.f;
     aOpen = 0.f;
@@ -300,6 +308,15 @@ void Dropdown::OpenMenu() {
     card->H = menuH;
 
     card->Opacity = 0.f;       // 先透明再挂上去：否则第一帧会以全不透明画出来，看起来闪一下
+
+    // 全屏点击毯垫在菜单下面：点在菜单外时由它吃掉，只关菜单，不会点到底下的控件/弹窗
+    auto self0 = this;
+    catcher_ = std::make_shared<Widget>();
+    catcher_->FillHost = true;
+    catcher_->Interactive = true;
+    catcher_->Clicked = [self0] { self0->CloseMenu(); };
+    Host->AddOverlay(catcher_);
+
     menu_ = card;
     Open = true;
     Host->AddOverlay(card);

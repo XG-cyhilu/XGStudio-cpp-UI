@@ -293,6 +293,7 @@ public:
 
 private:
     std::shared_ptr<Widget> menu_;
+    std::shared_ptr<Widget> catcher_;   // 菜单展开时的全屏点击毯：点在菜单外只收菜单，不穿到下面
     std::vector<Widget*> menuRows_;   // 菜单项（弱引用式的裸指针，随 menu_ 一起销毁）
     float aLinear = 0.f;              // 线性进度 0..1，驱动 aOpen 的 smoothstep
     void OpenMenu();
