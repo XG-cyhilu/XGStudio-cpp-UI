@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -161,6 +161,8 @@ private:
     unsigned long long statTick_ = 0;
     int paintFrames_ = 0;
     float paintMsAcc_ = 0.f;
+    float arrangeMsAcc_ = 0.f;
+    unsigned long long paintTick_ = 0;   // 上次真正绘制的时间，用来合并同帧多次 WM_PAINT
     float lastPaintMs_ = 0.f;
     int lastDirtyN_ = 0;
     D2D1_RECT_F lastDirtyRc_{ 0, 0, 0, 0 };

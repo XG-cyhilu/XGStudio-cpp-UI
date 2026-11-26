@@ -50,6 +50,9 @@ struct VCUI_API Gfx {
     int clipDepth = 0;
     float dpi_ = 96.f;
     float alpha = 1.f;    // 全局不透明度（弹层淡入用），作用在画笔上
+    // 局部重绘裁剪：PaintTree 跳过与脏区不相交的子树，省掉画了又裁掉的开销
+    bool cullOn = false;
+    D2D1_RECT_F cullRect{ 0, 0, 0, 0 };
 
     bool Init(HWND hwnd);
     void Resize(UINT w, UINT h);

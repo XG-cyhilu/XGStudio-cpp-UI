@@ -215,8 +215,13 @@ void Surface::Tick(float dt) {
     }
 
     if (dirty) {
-        if (!anyRect) Invalidate();
-        else {
+        if (!anyRect) {
+            // 只是后台泵要跑（下载进度、图标队列），没有可视变化：
+            // 停掉 60fps 帧循环，改用 40ms 定时器继续泵，别白烧 CPU
+            animating_ = false;
+            SetTimer(hwnd_, 4, 40, nullptr);
+        } else {
+            KillTimer(hwnd_, 4);
             // 动画只重绘标脏区域（含覆盖层）：让淡出这类小区域动画保持满帧，而不是每帧整窗重画。
             // 余量要盖住阴影扩散范围，否则弹层边缘会出现一圈陈旧像素。
             acc.left -= 28; acc.top -= 28; acc.right += 28; acc.bottom += 36;
@@ -225,6 +230,7 @@ void Surface::Tick(float dt) {
         lastDirtyN_ = nDirty;
         lastDirtyRc_ = acc;
     } else {
+        KillTimer(hwnd_, 4);
         animating_ = false;   // 没有动画，帧循环睡觉；光标闪烁由定时器负责
     }
 }
@@ -519,6 +525,9 @@ void Surface::Paint() {
     g_.rt->SetTransform(D2D1::Matrix3x2F::Scale(s, s, D2D1::Point2F(0, 0)));
 
     bool partial = !pendingFull_ && pendingDirty_.right > pendingDirty_.left;
+    g_.cullOn = partial;
+    g_.cullRect = D2D1_RECT_F{ pendingDirty_.left - 2, pendingDirty_.top - 2,
+                               pendingDirty_.right + 2, pendingDirty_.bottom + 2 };
     if (partial) {
         g_.PushClip(pendingDirty_);
         g_.FillRect(pendingDirty_, theme_.t.bj);
@@ -526,11 +535,15 @@ void Surface::Paint() {
         g_.Clear(theme_.t.bj);
     }
 
+    g_.rt->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);   // 位图 RT 上 ClearType 会被逐次模拟，灰度快得多
     PaintCtx ctx{ g_, theme_.t, theme_.m, s };
     ctx.time = float((GetTickCount64() - startTick_) % 1000000) / 1000.f;
 
     if (root_) {
+        QueryPerformanceCounter(&q0);
         root_->Arrange(D2D1_RECT_F{ 0, 0, w, h });
+        QueryPerformanceCounter(&q1);
+        arrangeMsAcc_ += float(q1.QuadPart - q0.QuadPart) * 1000.f / float(qf.QuadPart);
         root_->PaintTree(ctx);
     }
     for (auto& o : overlays_) {
@@ -561,7 +574,7 @@ void Surface::Paint() {
             float avg = paintFrames_ ? paintMsAcc_ / float(paintFrames_) : 0.f;
             wchar_t buf[160];
             if (paintFrames_)
-                swprintf_s(buf, L"%s  |  fps %.0f  paint %.2fms", title_.c_str(), fps, avg);
+                swprintf_s(buf, L"%s  |  fps %.0f  paint %.2fms  arrange %.2fms", title_.c_str(), fps, avg, paintFrames_ ? arrangeMsAcc_ / float(paintFrames_) : 0.f);
             else
                 swprintf_s(buf, L"%s  |  idle  last %.2fms", title_.c_str(), lastPaintMs_);
             lastPaintMs_ = avg;
@@ -569,10 +582,12 @@ void Surface::Paint() {
             statTick_ = now;
             paintFrames_ = 0;
             paintMsAcc_ = 0.f;
+            arrangeMsAcc_ = 0.f;
         }
     }
     pendingFull_ = false;
     pendingDirty_ = D2D1_RECT_F{ 0, 0, 0, 0 };
+    paintTick_ = GetTickCount64();
 }
 
 LRESULT CALLBACK Surface::WndProcThunk(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
@@ -605,6 +620,12 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd_, &ps);
         (void)hdc;
+        // 节流：8ms 内的多次 WM_PAINT 合并，等帧循环下一次 UpdateWindow 再画
+        unsigned long long tickNow = GetTickCount64();
+        if (!pendingFull_ && paintTick_ && tickNow - paintTick_ < 8) {
+            EndPaint(hwnd_, &ps);
+            return 0;
+        }
         Paint();
         EndPaint(hwnd_, &ps);
         return 0;
@@ -694,15 +715,18 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
         }
 
         Widget* w = HitAt(x, y);
-        if (w != hot_) {
+        bool hotChanged = (w != hot_);
+        if (hotChanged) {
             if (hot_) { hot_->Hover = false; hot_->OnHover(false); }
             hot_ = w;
             if (hot_) { hot_->Hover = true; hot_->OnHover(true); }
             ArmTooltip(hot_);
         }
         UpdateCursor(x, y);
-        KickAnim();
-        Invalidate();
+        if (hotChanged) {
+            KickAnim();    // 只有悬停目标变了才起缓动；单纯移动鼠标不再整窗重画
+            Invalidate();
+        }
         return 0;
     }
 
@@ -769,6 +793,13 @@ LRESULT Surface::Handle(UINT msg, WPARAM wp, LPARAM lp) {
             Widget* w = tipPending_;
             tipPending_ = nullptr;
             if (w && w == hot_ && !mouseDown_) ShowTooltipFor(w);
+            return 0;
+        }
+        if (wp == 4) {                      // 后台泵节拍：没有可视动画时的低频推进
+            unsigned long long now4 = GetTickCount64();
+            float dt4 = float(now4 - animLast_) / 1000.f;
+            animLast_ = now4;
+            Tick(dt4);
             return 0;
         }
         if (wp == 3) {                      // 输入框光标闪烁：静止时靠它，不拉帧循环

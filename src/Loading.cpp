@@ -31,6 +31,7 @@ D2D1_SIZE_F Spinner::Desired(float availW, float availH) {
 }
 
 bool Spinner::Update(float dt) {
+    AnimDirty = true;
     if (!Visible) return false;
     phase_ += dt * Speed;
     phase_ = std::fmod(phase_, 1.f);
@@ -71,6 +72,7 @@ D2D1_SIZE_F Skeleton::Desired(float availW, float availH) {
 }
 
 bool Skeleton::Update(float dt) {
+    AnimDirty = true;
     if (!Visible) return false;
     t_ += dt;
     if (t_ > 3600.f) t_ = std::fmod(t_, Period);   // 别让浮点无限增长

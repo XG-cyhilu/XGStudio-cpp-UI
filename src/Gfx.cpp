@@ -1,4 +1,4 @@
-﻿// Copyright 2026 XGstudio
+// Copyright 2026 XGstudio
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -139,6 +139,9 @@ ID2D1SolidColorBrush* Gfx::Solid(D2D1_COLOR_F c) {
         float a = c.a * alpha;
         c.a = a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
     }
+    // 颜色按 1/63 量化：缓动插值过程中不会每帧新建画笔（误差 < 4/255，肉眼无感）
+    auto q = [](float v) { float x = (float)((int)(v * 63.f + .5f)); return x > 63.f ? 1.f : x / 63.f; };
+    c.r = q(c.r); c.g = q(c.g); c.b = q(c.b); c.a = q(c.a);
     uint32_t key = ColorKey(c);
     auto it = brushes.find(key);
     if (it != brushes.end()) return it->second.Get();

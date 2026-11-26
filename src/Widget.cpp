@@ -127,6 +127,12 @@ void Widget::Paint(PaintCtx& ctx) {
 
 void Widget::PaintTree(PaintCtx& ctx) {
     if (!Visible) return;
+    if (ctx.g.cullOn) {
+        if (ctx.g.alpha <= .003f) return;                      // 全透明子树直接跳过
+        if (fr_.right <= ctx.g.cullRect.left || fr_.left >= ctx.g.cullRect.right ||
+            fr_.bottom <= ctx.g.cullRect.top || fr_.top >= ctx.g.cullRect.bottom)
+            return;                                            // 不在脏区：连文字排版都不做
+    }
     float savedAlpha = ctx.g.alpha;
     ctx.g.alpha *= Opacity;
     Paint(ctx);

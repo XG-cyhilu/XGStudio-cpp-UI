@@ -80,6 +80,7 @@ int RunAppLoop() {
     LARGE_INTEGER freq, last;
     QueryPerformanceFrequency(&freq);
     QueryPerformanceCounter(&last);
+    ULONGLONG lastFrameTick = 0;
 
     for (;;) {
         // 消息优先：把所有已排队的消息处理干净（含本进程所有窗口）
@@ -96,6 +97,14 @@ int RunAppLoop() {
         }
 
         if (anyAnim) {
+            // 帧节奏上限 ~120fps：同一帧内的多次标脏（滚轮、鼠标移动）合并成一次绘制
+            ULONGLONG tick = GetTickCount64();
+            if (tick - lastFrameTick < 8) {
+                MsgWaitForMultipleObjectsEx(0, nullptr, (DWORD)(8 - (tick - lastFrameTick)),
+                                            QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+                continue;
+            }
+            lastFrameTick = tick;
             LARGE_INTEGER now;
             QueryPerformanceCounter(&now);
             float dt = float(now.QuadPart - last.QuadPart) / float(freq.QuadPart);

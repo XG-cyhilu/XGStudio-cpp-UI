@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <unordered_map>
 
 using Microsoft::WRL::ComPtr;
 
@@ -209,35 +210,61 @@ void Gfx::SvgPath(D2D1_RECT_F box, const std::wstring& d, D2D1_COLOR_F c, float 
 
     auto br = Solid(c);
     if (!br) return;
+
+    // 几何按（路径串 + 尺寸 + 填充/描边）缓存，且建在本地坐标系：列表图标不再每帧解析+建几何
+    static std::unordered_map<uint64_t, ComPtr<ID2D1PathGeometry>> geoCache;
+    uint64_t gh = 1469598103934665603ULL;
+    auto mix = [&gh](uint64_t v) { gh ^= v; gh *= 1099511628211ULL; };
+    for (wchar_t ch : d) mix((uint64_t)ch);
+    mix((uint64_t)(int)(bw * 4.f));
+    mix((uint64_t)(int)(bh * 4.f));
+    mix(filled ? 1u : 0u);
+
     ComPtr<ID2D1PathGeometry> geo;
-    if (FAILED(factory->CreatePathGeometry(&geo))) return;
-    ComPtr<ID2D1GeometrySink> sink;
-    if (FAILED(geo->Open(&sink))) return;
-    for (auto& f : figs) {
-        D2D1_POINT_2F pc = tf(f.start);
-        sink->BeginFigure(pc, D2D1_FIGURE_BEGIN_FILLED);
-        for (auto& cm : f.cmds) {
-            if (cm.t == 0) {
-                pc = tf(cm.p[0]);
-                sink->AddLine(pc);
-            } else if (cm.t == 1) {
-                D2D1_POINT_2F c1 = tf(cm.p[0]), c2 = tf(cm.p[1]), e = tf(cm.p[2]);
-                sink->AddBezier(D2D1::BezierSegment(c1, c2, e));
-                pc = e;
-            } else {
-                // 二次转三次：控制点各取 2/3 位置
-                D2D1_POINT_2F q = tf(cm.p[0]), e = tf(cm.p[1]);
-                D2D1_POINT_2F c1 = D2D1::Point2F(pc.x + (q.x - pc.x) * 2.f / 3.f, pc.y + (q.y - pc.y) * 2.f / 3.f);
-                D2D1_POINT_2F c2 = D2D1::Point2F(e.x + (q.x - e.x) * 2.f / 3.f, e.y + (q.y - e.y) * 2.f / 3.f);
-                sink->AddBezier(D2D1::BezierSegment(c1, c2, e));
-                pc = e;
+    auto hit = geoCache.find(gh);
+    if (hit != geoCache.end()) {
+        geo = hit->second;
+    } else {
+        ComPtr<ID2D1PathGeometry> made;
+        if (FAILED(factory->CreatePathGeometry(&made))) return;
+        ComPtr<ID2D1GeometrySink> sink;
+        if (FAILED(made->Open(&sink))) return;
+        auto tl = [&](const Pt& q) { return D2D1::Point2F((q.x - minx) * sc, (q.y - miny) * sc); };
+        for (auto& f : figs) {
+            D2D1_POINT_2F pc = tl(f.start);
+            sink->BeginFigure(pc, D2D1_FIGURE_BEGIN_FILLED);
+            for (auto& cm : f.cmds) {
+                if (cm.t == 0) {
+                    pc = tl(cm.p[0]);
+                    sink->AddLine(pc);
+                } else if (cm.t == 1) {
+                    D2D1_POINT_2F c1 = tl(cm.p[0]), c2 = tl(cm.p[1]), e = tl(cm.p[2]);
+                    sink->AddBezier(D2D1::BezierSegment(c1, c2, e));
+                    pc = e;
+                } else {
+                    // 二次转三次：控制点各取 2/3 位置
+                    D2D1_POINT_2F q = tl(cm.p[0]), e = tl(cm.p[1]);
+                    D2D1_POINT_2F c1 = D2D1::Point2F(pc.x + (q.x - pc.x) * 2.f / 3.f, pc.y + (q.y - pc.y) * 2.f / 3.f);
+                    D2D1_POINT_2F c2 = D2D1::Point2F(e.x + (q.x - e.x) * 2.f / 3.f, e.y + (q.y - e.y) * 2.f / 3.f);
+                    sink->AddBezier(D2D1::BezierSegment(c1, c2, e));
+                    pc = e;
+                }
             }
+            sink->EndFigure(f.closed ? D2D1_FIGURE_END_CLOSED : D2D1_FIGURE_END_OPEN);
         }
-        sink->EndFigure(f.closed ? D2D1_FIGURE_END_CLOSED : D2D1_FIGURE_END_OPEN);
+        sink->Close();
+        geo = made;
+        if (geoCache.size() > 600) geoCache.clear();
+        geoCache[gh] = geo;
     }
-    sink->Close();
+
+    // 几何在本地坐标，绘制时平移到 box 左上角再叠加当前变换
+    D2D1_MATRIX_3X2_F prev{};
+    rt->GetTransform(&prev);
+    rt->SetTransform(D2D1::Matrix3x2F::Translation(ox, oy) * prev);
     if (filled || stroke <= 0.f) rt->FillGeometry(geo.Get(), br);
     else rt->DrawGeometry(geo.Get(), br, stroke);
+    rt->SetTransform(prev);
 }
 
 // ---------------- SvgIcon ----------------
